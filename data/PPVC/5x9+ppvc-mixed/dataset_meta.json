@@ -1,0 +1,7 @@
+{
+ "seed0": 70000,
+ "n_instances": 50,
+ "n_modules": 5,
+ "ppvc_mix": "mixed",
+ "purpose": "S generalization test set (eval-only)"
+}

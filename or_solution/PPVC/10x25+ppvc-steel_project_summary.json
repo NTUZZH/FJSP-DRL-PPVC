@@ -1,0 +1,21 @@
+{
+  "dataset": "10x25+ppvc-steel_project",
+  "n_solved": 30,
+  "time_limit_s": 300.0,
+  "makespan_lag": {
+    "mean": 203.3,
+    "min": 182.0,
+    "max": 219.0
+  },
+  "makespan_free": {
+    "mean": 150.6,
+    "min": 145.0,
+    "max": 155.0
+  },
+  "mean_inflation_pct": 34.97938965934809,
+  "status_counts_lag": {
+    "FEASIBLE": 30
+  },
+  "validator_infeasible_count": 0,
+  "total_wall_time_s": 18005.365247488022
+}

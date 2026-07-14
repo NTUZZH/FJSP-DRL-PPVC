@@ -1,0 +1,22 @@
+{
+  "dataset": "10x25+ppvc-mixed",
+  "n_solved": 100,
+  "time_limit_s": 300.0,
+  "makespan_lag": {
+    "mean": 203.17,
+    "min": 175.0,
+    "max": 221.0
+  },
+  "makespan_free": {
+    "mean": 121.64,
+    "min": 115.0,
+    "max": 142.0
+  },
+  "mean_inflation_pct": 67.24432639929628,
+  "status_counts_lag": {
+    "FEASIBLE": 14,
+    "OPTIMAL": 86
+  },
+  "validator_infeasible_count": 0,
+  "total_wall_time_s": 35082.68430995941
+}

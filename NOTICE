@@ -1,0 +1,49 @@
+NOTICE — Attribution for a derivative work
+==========================================
+
+This repository is a DERIVATIVE WORK. It adapts and extends existing open-source
+research code. The original components remain the property of their respective
+authors and are subject to their original licenses. Users must comply with those
+upstream licenses and cite the original works.
+
+Primary upstream
+----------------
+DANIEL — "Flexible Job Shop Scheduling via Dual Attention Network Based
+Reinforcement Learning," R. Wang, G. Wang, J. Sun, F. Deng, J. Chen,
+IEEE Transactions on Neural Networks and Learning Systems, 2024,
+DOI: 10.1109/TNNLS.2023.3306421.  Repository: https://github.com/wrqccc/FJSP-DRL
+
+Derived components in this repo (adapted from DANIEL):
+  - model/                          dual-attention policy network and PPO
+  - fjsp_env_same_op_nums.py        base FJSP environment
+  - fjsp_env_various_op_nums.py     base FJSP environment
+  - ortools_solver.py               OR-Tools CP-SAT baseline
+  - common_utils.py, data_utils.py, params.py, train.py, print_test_result.py,
+    test_trained_model.py, test_heuristic.py   (base training/eval scaffolding)
+
+Further upstreams credited by DANIEL
+------------------------------------
+  - L2D                  https://github.com/zcaicaros/L2D
+  - fjsp-drl             https://github.com/songwenas12/fjsp-drl
+  - Google OR-Tools      https://github.com/google/or-tools
+  - pyGAT                https://github.com/Diego999/pyGAT
+
+Original contributions of this repository
+-----------------------------------------
+The PPVC / FJSP-with-time-lags (FJSP-TL) extensions, the BCA-grounded benchmark
+generator, and the evaluation/analysis pipeline are original to this repository
+(see README.md for the file list). With every extension flag disabled, the code
+reproduces the published DANIEL results bit-exactly.
+
+Licensing status (verified 2026-06-15)
+--------------------------------------
+The DANIEL upstream repository (https://github.com/wrqccc/FJSP-DRL) carries NO
+explicit license. Its code therefore remains under the original authors' copyright
+(all rights reserved). For this reason NO blanket open-source LICENSE is applied to
+this repository: doing so would mis-state the rights to the DANIEL-derived
+components above. The DANIEL-derived components are reproduced here for academic
+transparency and reproducibility only, with the derivation recorded here and in the
+README, and the original works cited in the accompanying paper.
+The original contributions listed above are the author's own work. Anyone wishing
+to reuse the DANIEL-derived components should contact the DANIEL authors for
+permission.

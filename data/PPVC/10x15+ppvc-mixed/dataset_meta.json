@@ -1,0 +1,7 @@
+{
+ "seed0": 60000,
+ "n_instances": 100,
+ "n_modules": 10,
+ "ppvc_mix": "mixed",
+ "purpose": "M-tight test set (contention amplifies method gaps)"
+}

@@ -1,0 +1,22 @@
+{
+  "dataset": "10x25+ppvc-rc_project",
+  "n_solved": 50,
+  "time_limit_s": 300.0,
+  "makespan_lag": {
+    "mean": 217.22,
+    "min": 202.0,
+    "max": 230.0
+  },
+  "makespan_free": {
+    "mean": 124.24,
+    "min": 119.0,
+    "max": 130.0
+  },
+  "mean_inflation_pct": 74.85478120062832,
+  "status_counts_lag": {
+    "FEASIBLE": 43,
+    "OPTIMAL": 7
+  },
+  "validator_infeasible_count": 0,
+  "total_wall_time_s": 28336.37156701088
+}

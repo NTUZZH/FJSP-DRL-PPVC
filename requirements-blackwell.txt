@@ -1,0 +1,22 @@
+# Verified dependency set for FJSP-DRL-2 on an NVIDIA Blackwell (sm_120) GPU
+# (RTX PRO 5000), Ubuntu 24.04, conda env "fjsp" with Python 3.11.
+#
+# WHY NOT the README versions: torch 1.11.0+cu113 / python 3.7.11 cannot run on
+# Blackwell — cu113 has no sm_120 kernels. torch>=2.7/cu128 is required, which in
+# turn requires python>=3.9. numpy is pinned <2 to stay close to the original
+# numpy 1.21 era and avoid numpy 2.0 breaking changes.
+#
+# Install torch from the CUDA 12.8 wheel index (NOT plain PyPI):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# Then the rest from PyPI:
+#   pip install -r requirements-blackwell.txt   (excluding the torch line below)
+#
+# Code change required for new torch: train.py's torch.set_default_tensor_type(...)
+# was removed in torch>=2.3 and is replaced by set_default_device + set_default_dtype.
+
+torch==2.11.0+cu128   # install via the cu128 index-url above
+numpy==1.26.4
+ortools==9.14.6206
+pandas==3.0.3
+tqdm==4.68.2
+openpyxl==3.1.5       # needed by print_test_result.py for .xlsx export
