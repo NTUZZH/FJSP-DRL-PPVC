@@ -35,9 +35,17 @@ Modeling assumptions (stated for the paper):
   - Each operation is one station visit; trade micro-ordering inside the
     finishing phase is aggregated into the 4-phase structure (the guidebook
     itself notes per-fabricator variation).
-  - All four routing classes have EXACTLY 22 operations, so a fixed module
-    count gives a fixed total op count (keeps FJSPEnvForSameOpNums usable
-    with mixed-class instances, no padding).
+  - route_variant='fixed' (default): all four routing classes have EXACTLY
+    22 operations, so a fixed module count gives a fixed total op count
+    (keeps FJSPEnvForSameOpNums usable with mixed-class instances, no
+    padding).
+  - route_variant='variable': each module independently omits operations
+    that are optional per module (OPTIONAL_OPS below: factory final paint
+    coat, trial assembly / trial stack, HVAC ducting, doors and windows), so
+    module lengths range from 18 to 22 operations. The draws that decide the
+    omissions come from a second RNG stream, AFTER the fixed-route draws, so
+    a variable instance equals the fixed instance of the same seed with the
+    omitted operations (and their own lags) deleted.
   - Time unit: integer HOURS; all durations >= 1 (op_pt == 0 is the
     "incompatible" sentinel in DANIEL).
   - PT model: per-op nominal duration from the range, then +/-20% across
@@ -46,7 +54,7 @@ Modeling assumptions (stated for the paper):
     successor becomes eligible. The machine is free during the lag.
 
 Output contract (mirrors SD2_instance_generator + PPVC metadata):
-    job_length     [J]   int    ops per module (always 22)
+    job_length     [J]   int    ops per module (22 when fixed; 18-22 when variable)
     op_pt          [N,M] int    processing time, 0 = incompatible
     meta dict:
         op_type         [N] int  0..4 {structural, MEP, finishing, assembly, QC}
@@ -57,6 +65,9 @@ Output contract (mirrors SD2_instance_generator + PPVC metadata):
         module_weight_t [J] float module weight in tonnes  [G 2.6]
         op_name         [N] str  human-readable op names
         station_counts  dict     factory configuration
+        route_variant   str      'variable' (key present only for variable
+                                 routes; an absent key means 'fixed', so
+                                 fixed-route output stays byte-identical)
 
 Self-test:  python ppvc_instance_generator.py
 """
@@ -167,6 +178,38 @@ PRESET_MIXES = {
     'mixed':         (0.375, 0.125, 0.375, 0.125),
 }
 
+# ---------------------------------------------------------------------------
+# Variable routes (route_variant='variable'): per-module optional operations.
+# Each entry: op name(s) that may be omitted -> probability that a module
+# omits it. An omitted op is deleted together with its own post-op lag; the
+# lags of the remaining ops are unchanged. Every route contains exactly one
+# op of each entry, so a module has 22 - (number of omissions) = 18..22 ops.
+# ---------------------------------------------------------------------------
+OPTIONAL_OPS = (
+    # (a) Second factory paint coat. The guidebook allows the final coat to
+    #     be applied on site [G 10.2]; a module that takes its final coat on
+    #     site skips paint_coat_2 and its 12-24 h drying lag. Share of
+    #     modules finished on site [E].
+    (('paint_coat_2',), 0.5),
+    # (b) Trial assembly (RC, [G 4.1.2 end-note]) / trial stack (steel,
+    #     [G 4.2.2 step7]). The guidebook names the step but not its
+    #     frequency; the fraction of modules exempted (trial fitting done on
+    #     a sample of modules) is [E].
+    (('trial_assembly', 'trial_stack'), 0.4),
+    # (c) HVAC ducting, part of the MEP fit-out [G 4.1.3 steps3-4 /
+    #     4.2.2 step8]. Fraction of modules without
+    #     ducted air-conditioning (e.g. served by wall-mounted units) [E].
+    (('HVAC_ducting',), 0.3),
+    # (d) Doors and windows [G 4.1.3 steps7-8]. Fraction of internal
+    #     (non-facade) modules whose frames and glazing are not installed in
+    #     the factory [E].
+    (('doors_windows',), 0.25),
+)
+ROUTE_VARIANTS = ('fixed', 'variable')
+# Offset that separates the optional-op RNG stream from the main stream, so
+# the fixed-route draws (and hence the fixed instances) are unaffected.
+_OPTIONAL_OP_STREAM = 7919
+
 
 def build_factory(station_counts):
     """station_counts: dict type->count  ->  (mch_type [M], machine id ranges)."""
@@ -182,7 +225,8 @@ def build_factory(station_counts):
 def ppvc_instance_generator(n_modules=10,
                             class_mix='mixed',
                             station_counts=None,
-                            seed=None):
+                            seed=None,
+                            route_variant='fixed'):
     """
     Generate one PPVC-FJSP instance.
 
@@ -193,8 +237,14 @@ def ppvc_instance_generator(n_modules=10,
             - explicit per-module class indices (len n_modules)
     :param station_counts: dict station type -> count (DEFAULT_FACTORY)
     :param seed: RNG seed for reproducibility
+    :param route_variant: 'fixed' (every module has 22 ops, the original
+            generator) or 'variable' (each module omits the optional ops of
+            OPTIONAL_OPS with the listed probabilities, 18-22 ops per module)
     :return: (job_length [J], op_pt [N,M], meta dict)
     """
+    if route_variant not in ROUTE_VARIANTS:
+        raise ValueError(f'route_variant must be one of {ROUTE_VARIANTS}, '
+                         f'got {route_variant!r}')
     rng = np.random.default_rng(seed)
     station_counts = dict(station_counts or DEFAULT_FACTORY)
     mch_type, type_ranges = build_factory(station_counts)
@@ -252,7 +302,47 @@ def ppvc_instance_generator(n_modules=10,
         'module_weight_t': module_weight,
         'op_name': op_name, 'station_counts': station_counts,
     }
+    if route_variant == 'variable':
+        job_length, op_pt, meta = _drop_optional_ops(job_length, op_pt, meta, seed)
     return job_length, op_pt, meta
+
+
+def _drop_optional_ops(job_length, op_pt, meta, seed):
+    """
+    Turn a fixed-route instance into a variable-route one by deleting, per
+    module, the optional operations of OPTIONAL_OPS that the module omits.
+
+    The omission draws use their own RNG stream (seeded from `seed`), with
+    one uniform draw per OPTIONAL_OPS entry per module in a fixed order, so
+    the result is reproducible and the fixed-route draws are untouched. Each
+    per-op meta array is filtered with the same keep-mask; job_length
+    carries the real per-module op counts.
+    """
+    opt_rng = np.random.default_rng(
+        None if seed is None else [_OPTIONAL_OP_STREAM, int(seed)])
+    n_modules = len(job_length)
+    local_names = [n.split(':', 1)[1] for n in meta['op_name']]
+    keep = np.ones(len(local_names), dtype=bool)
+    new_job_length = np.zeros(n_modules, dtype=int)
+    row = 0
+    for j in range(n_modules):
+        seg = range(row, row + int(job_length[j]))
+        for names, p_omit in OPTIONAL_OPS:
+            omit = opt_rng.random() < p_omit
+            if omit:
+                hits = [i for i in seg if local_names[i] in names]
+                assert len(hits) == 1, f'module {j}: expected one of {names}'
+                keep[hits[0]] = False
+        new_job_length[j] = int(keep[row:row + int(job_length[j])].sum())
+        row += int(job_length[j])
+
+    per_op = ('op_type', 'op_station', 'time_lag')
+    new_meta = dict(meta)
+    for k in per_op:
+        new_meta[k] = meta[k][keep]
+    new_meta['op_name'] = [n for n, kp in zip(meta['op_name'], keep) if kp]
+    new_meta['route_variant'] = 'variable'
+    return new_job_length, op_pt[keep], new_meta
 
 
 # ---------------------------------------------------------------------------

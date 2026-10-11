@@ -1,0 +1,8 @@
+{
+ "seed0": 100,
+ "n_instances": 100,
+ "n_modules": 10,
+ "ppvc_mix": "mixed",
+ "ppvc_factory": "default",
+ "lag_scale": 0.5
+}

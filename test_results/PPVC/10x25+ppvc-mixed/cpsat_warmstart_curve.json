@@ -1,0 +1,21 @@
+{
+  "dataset": "10x25+ppvc-mixed",
+  "n": 50,
+  "budgets": {
+    "1.0": {
+      "mean_makespan": 205.84,
+      "n_proven_optimal": 24,
+      "mean_solve_s": 0.7216937398910522
+    },
+    "5.0": {
+      "mean_makespan": 204.06,
+      "n_proven_optimal": 32,
+      "mean_solve_s": 2.2957585000991823
+    },
+    "30.0": {
+      "mean_makespan": 203.8,
+      "n_proven_optimal": 36,
+      "mean_solve_s": 10.159549317359925
+    }
+  }
+}

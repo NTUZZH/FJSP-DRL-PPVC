@@ -28,16 +28,53 @@ CORRECTNESS IS PARAMOUNT
   and, for breakdown, that no op runs on the broken machine during the outage.
   Any infeasibility / prefix violation is reported LOUDLY, never averaged over.
 
+CONTENTION EVIDENCE
+  Every time-limited solve records its wall and process-CPU seconds, workers,
+  cpu_share = CPU s / (wall s x workers), status and hit_limit (>= 95 % of
+  the budget used); each record adds cpu_share_min, n_timed_solves,
+  n_hit_limit, n_low_share, n_no_evidence, affinity and loadavg_start. A
+  budget-limited solve with cpu_share < 0.9 ran on shared cores and is
+  invalid (the summary table and the npy 'contention' entry show it).
+
+NEW DISRUPTION TYPES (urgent_arrival, material_shortage, pt_deviation,
+cancellation)
+  Their disrupted state is built by eval_reactive.build_disrupted_state (now
+  importable), so every arm here sees exactly the state eval_reactive builds:
+    * urgent_arrival: the realized instance has the new module appended; its
+      ops are uncommitted and start >= t_d like every residual op.
+    * material_shortage: the job's next op gets start >= ceil(release).
+    * pt_deviation: the in-flight op is part of the committed prefix with its
+      longer realized completion; the realized pt matrix carries the longer pt.
+    * cancellation: the removed ops are absent from the realized instance.
+  Validation, prefix checks and the right-shift arm use the realized instance;
+  the right-shift arm for these types is eval_reactive.right_shift_residual,
+  and nervousness is measured over the ops present in both plans
+  (eval_reactive.nervousness_mapped). The stability sweep accepts them too
+  (added ops carry no penalty: they have no original plan).
+
 CLI (matches eval_reactive defaults)
   python eval_residual_cpsat.py
       [--model_name 10x25+ppvc-mixed+full]
       [--data_path data/PPVC/10x25+ppvc-mixed]
-      [--disruption_type lag_perturb|breakdown|both]   (default both)
-      [--disruption_offset 0.4] [--lag_factor 2.0]
-      [--cpsat_budgets 1,5,30] [--seed_test 50] [--max_instances N]
+      [--disruption_type lag_perturb|breakdown|both|urgent_arrival|
+                         material_shortage|pt_deviation|cancellation|all]
+                                                        (default both)
+      [--disruption_offset 0.4] [--lag_factor 2.0] [--pt_factor 1.5]
+      [--shortage_factor 0.5] [--shortage_basis op_mean|remaining_work]
+      [--cpsat_budgets 1,5,30] [--cpsat_workers 0] [--seed_test 50]
+      [--max_instances N] [--out_dir DIR] [--hint none|right_shift]
+  --disruption_type also takes a comma list of single types.
+  --hint right_shift starts every residual CP-SAT solve from the right-shift
+  plan of the same instance (retimed to the integer model; see
+  right_shift_hint); the records then carry hint_given, hint_exact_rs,
+  rs_makespan, hint_makespan, cpsat_makespan, above_rs and above_hint. The
+  stability sweep ignores --hint.
 
-This script REPLICATES (does not import) the needed logic from eval_reactive.py
-because eval_reactive.parse_cli() runs at import time and would eat our argv.
+For lag_perturb and breakdown this script keeps its own REPLICATED copy of the
+disruption logic of eval_reactive.py (written when eval_reactive parsed its CLI
+at import time); the copy is kept line-for-line consistent with
+eval_reactive.build_disrupted_state, and both reproduce the earlier numbers.
+The four new types import the shared construction instead of replicating it.
 """
 import argparse
 import glob
@@ -48,6 +85,31 @@ import sys
 import time
 
 import numpy as np
+
+# contention evidence of the time-limited solves (no import-time side effects)
+from eval_stochastic_lags import (SolveClock, contention_arrays,
+                                  contention_fields, contention_summary,
+                                  contention_table, cpsat_timing, loadavg_now,
+                                  store_contention, HIT_LIMIT_FRAC,
+                                  LOW_CPU_SHARE)
+
+
+SINGLE_DISRUPTIONS = ('lag_perturb', 'breakdown', 'urgent_arrival',
+                      'material_shortage', 'pt_deviation', 'cancellation')
+DISRUPTION_CHOICES = SINGLE_DISRUPTIONS + ('both', 'all')
+
+
+def _disruption_arg(s):
+    """--disruption_type: a known choice, or a comma list of single types."""
+    if s in DISRUPTION_CHOICES:
+        return s
+    parts = [p.strip() for p in s.split(',') if p.strip()]
+    bad = [p for p in parts if p not in SINGLE_DISRUPTIONS]
+    if not parts or bad:
+        raise argparse.ArgumentTypeError(
+            f'invalid disruption type(s) {bad or s!r}; choose from '
+            f'{", ".join(DISRUPTION_CHOICES)} or a comma list of single types')
+    return ','.join(parts)
 
 
 def parse_cli():
@@ -61,11 +123,28 @@ def parse_cli():
     ap.add_argument('--model_name', type=str, default='10x25+ppvc-mixed+full')
     ap.add_argument('--data_path', type=str,
                     default='data/PPVC/10x25+ppvc-mixed')
-    ap.add_argument('--disruption_type', type=str, default='both',
-                    choices=['lag_perturb', 'breakdown', 'both'])
+    ap.add_argument('--disruption_type', type=_disruption_arg, default='both',
+                    help='one of ' + ', '.join(DISRUPTION_CHOICES)
+                         + '; both = lag_perturb + breakdown; all = all six; '
+                         'or a comma list of single types')
+    ap.add_argument('--hint', type=str, default='none',
+                    choices=['none', 'right_shift'],
+                    help='right_shift: start each residual CP-SAT solve from '
+                         'the right-shifted plan (machine and start of every '
+                         'uncommitted op, retimed to the integer residual '
+                         'model) as a solution hint; none = cold start')
     ap.add_argument('--disruption_offset', type=float, default=0.4)
     ap.add_argument('--lag_factor', type=float, default=2.0)
+    ap.add_argument('--pt_factor', type=float, default=1.5)
+    ap.add_argument('--shortage_factor', type=float, default=0.5)
+    ap.add_argument('--shortage_basis', type=str, default='op_mean',
+                    choices=['op_mean', 'remaining_work'])
     ap.add_argument('--cpsat_budgets', type=str, default='1,5,30')
+    ap.add_argument('--cpsat_workers', type=int, default=0,
+                    help='CP-SAT num_workers (0 = solver default)')
+    ap.add_argument('--out_dir', type=str, default=None,
+                    help='output directory (default test_results/PPVC/'
+                         '<dataset>)')
     ap.add_argument('--seed_test', type=int, default=50)
     ap.add_argument('--max_instances', type=int, default=None)
     # --- Stability-aware CP-SAT frontier --------------------------------------
@@ -79,6 +158,10 @@ def parse_cli():
     ap.add_argument('--stability_budget', type=int, default=30,
                     help='per-solve CP-SAT budget (s) for the sweep')
     args = ap.parse_args()
+    if getattr(args, 'cpsat_workers', 1) == 0:
+        # 0 would start one CP-SAT worker per machine core whatever the affinity mask;
+        # use one worker per pinned core so the solve matches its CPU allocation
+        args.cpsat_workers = len(os.sched_getaffinity(0))
     sys.argv = [sys.argv[0]]  # clean argv for params.py's import-time parse
     return args
 
@@ -98,6 +181,7 @@ ARCH_KEYS = (
     'num_mlp_layers_actor', 'hidden_dim_actor',
     'num_mlp_layers_critic', 'hidden_dim_critic',
     'dropout_prob',
+    'framework',
 )
 
 NERVOUSNESS_TIME_THRESHOLD = 1.0  # 1 hour (instances are in hours)
@@ -113,6 +197,10 @@ def load_train_config(model_name):
     for k in ARCH_KEYS:
         if k in snap:
             setattr(configs, k, snap[k])
+    # snapshots written before --framework existed are DANIEL
+    configs.framework = snap.get('framework', 'DANIEL')
+    from common_utils import check_backbone_tag
+    check_backbone_tag(model_name, configs.framework)
     return snap
 
 
@@ -236,10 +324,29 @@ def _pick_breakdown_machine(env):
 # Build the disrupted state + capture the committed prefix.
 # ---------------------------------------------------------------------------
 
+def _import_eval_reactive():
+    """eval_reactive parses its CLI only as a script, so a plain import is safe
+    once params has been imported with a clean argv (done at module top)."""
+    import eval_reactive
+    return eval_reactive
+
+
+def _dparams(args):
+    return {'lag_factor': args.lag_factor, 'pt_factor': args.pt_factor,
+            'shortage_factor': args.shortage_factor,
+            'shortage_basis': args.shortage_basis}
+
+
 def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
                           use_type_embedding, disruption_type, offset,
-                          lag_factor):
+                          lag_factor, dparams=None, stem=None):
     """Greedy-commit the first k=ceil(offset*N) ops, then apply the disruption.
+
+    New types (urgent_arrival, material_shortage, pt_deviation, cancellation)
+    are built by eval_reactive.build_disrupted_state; the returned dict then
+    also carries the realized instance ('jl', 'pt', 'time_lag'), 'op_map',
+    'op_release', 'mch_release', 'new_ops' and 'legacy' (False). The legacy
+    branch below adds the same keys with identity values.
 
     Returns a dict capturing the FULL state needed by BOTH the residual CP-SAT
     model and DRL-reactive / right-shift comparators on the SAME disruption:
@@ -257,6 +364,18 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
     Also returns (env, state) AFTER the disruption is applied, ready for the
     DRL-reactive residual continuation (so we reuse the exact same env).
     """
+    if disruption_type not in ('lag_perturb', 'breakdown'):
+        ER = _import_eval_reactive()
+        dp = dict(dparams or {})
+        dp['lag_factor'] = lag_factor
+        ictx = ER.instance_context(stem, meta) if stem is not None else None
+        ds = ER.build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
+                                      use_type_embedding, disruption_type,
+                                      offset, dp, ictx)
+        env, state = ds.pop('env'), ds.pop('state')
+        ds['assigned_mch_prefix'] = ds['assigned_mch'].copy()
+        return ds, env, state
+
     M = pt.shape[1]
     n_ops = pt.shape[0]
     env, state = _new_env(jl, pt, meta, use_lag_features, use_type_embedding)
@@ -376,6 +495,13 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
         'assigned_mch_prefix': assigned_mch.copy(),
         'k': k,
         'info': info,
+        # realized-instance keys shared with the new disruption types
+        'jl': np.asarray(jl, dtype=int), 'pt': np.asarray(pt),
+        'time_lag': perturbed_time_lag, 'op_map': np.arange(n_ops),
+        'op_release': np.zeros(n_ops, dtype=float),
+        'mch_release': (np.zeros(M, dtype=float) if mch_ready_time is None
+                        else mch_ready_time.copy()),
+        'new_ops': [], 'legacy': True,
     }, env, env.state
 
 
@@ -417,14 +543,112 @@ def right_shift_baseline(jl, pt, assigned_mch_orig, op_ct_orig,
     return float(ms), sec, assigned_mch_orig.copy(), repaired_ct
 
 
+def right_shift_hint(jl, pt, perturbed_time_lag, disrupt, asg_rs, oct_rs):
+    """Turn the right-shift plan into a solution of the INTEGER residual model.
+
+    The right-shift plan fixes, for every uncommitted op, its machine
+    (asg_rs) and its position in that machine's queue (order of its
+    right-shift start). This function keeps both and gives every uncommitted
+    op the earliest start the residual CP-SAT model of residual_cpsat_solve
+    allows in that order: start >= round(t_d), the rounded lag after the job's
+    previous op (committed or not), the integer end of the previous op on the
+    machine (committed ops first, at their fixed integer times), the op's
+    ceil(release) (material_shortage, urgent_arrival) and, on a broken
+    machine, the end of the reserved outage. When the right-shift times are
+    already integer and satisfy those constraints, the result equals
+    oct_rs - pt exactly ('exact' is True); otherwise it is the same queue
+    order retimed (rounding of a fractional downtime or release, or a legacy
+    right-shift that moved a committed op).
+
+    Returns dict(assigned_mch int[N], start int[N] (committed: fixed start),
+    end int[N], makespan int, exact bool, ok bool, reason str).
+    """
+    n_ops, M = pt.shape
+    true_pt = np.asarray(pt, dtype=int)
+    jl = np.asarray(jl, dtype=int)
+    committed = np.asarray(disrupt['committed'], dtype=bool)
+    committed_mch = disrupt['committed_mch']
+    t_d = int(round(disrupt['t_disrupt_true']))
+    lag = np.rint(np.asarray(perturbed_time_lag, dtype=float)).astype(int)
+    asg = np.asarray(asg_rs, dtype=int).copy()
+    oct_rs = np.asarray(oct_rs, dtype=float)
+    first_of_job = np.zeros(n_ops, dtype=bool)
+    idx = 0
+    for L in jl:
+        first_of_job[idx] = True
+        idx += int(L)
+
+    start = np.full(n_ops, -1, dtype=np.int64)
+    end = np.full(n_ops, -1, dtype=np.int64)
+    tail = np.zeros(M, dtype=np.int64)
+    for op in np.where(committed)[0]:
+        m = int(committed_mch[op])
+        s_val = max(int(round(disrupt['committed_start'][op])), 0)
+        e_val = int(round(disrupt['committed_ct'][op]))
+        if e_val <= s_val:
+            e_val = s_val + max(1, int(true_pt[op, m]))
+        start[op], end[op] = s_val, e_val
+        asg[op] = m
+        tail[m] = max(tail[m], e_val)
+    # release floors exactly as the model encodes them
+    rel = {}
+    op_release = disrupt.get('op_release')
+    if op_release is not None:
+        for op in range(n_ops):
+            if not committed[op] and float(op_release[op]) > t_d:
+                rel[op] = int(math.ceil(float(op_release[op]) - 1e-9))
+    # breakdown outage: new work on the broken machine waits for its end
+    mfloor = np.zeros(M, dtype=np.int64)
+    bm = disrupt.get('broken_mch')
+    if disrupt.get('downtime_true') is not None and bm is not None:
+        dt = int(round(disrupt['downtime_true']))
+        if dt > 0:
+            mfloor[bm] = max(t_d + dt, int(tail[bm]))
+
+    unc = [op for op in range(n_ops) if not committed[op]]
+    for op in unc:
+        m = int(asg[op])
+        if m < 0 or true_pt[op, m] <= 0:
+            return {'ok': False, 'reason': f'op {op}: machine {m} not able',
+                    'exact': False}
+    rs_start = {op: float(oct_rs[op]) - float(pt[op, asg[op]]) for op in unc}
+    order = sorted(unc, key=lambda op: (rs_start[op], op))
+    for op in order:
+        m = int(asg[op])
+        s = t_d
+        if not first_of_job[op]:
+            p = op - 1
+            if end[p] < 0:
+                return {'ok': False, 'exact': False,
+                        'reason': f'op {op} queued before its predecessor'}
+            s = max(s, int(end[p]) + int(lag[p]))
+        s = max(s, int(tail[m]), int(mfloor[m]), rel.get(op, 0))
+        start[op] = s
+        end[op] = s + int(true_pt[op, m])
+        tail[m] = end[op]
+    exact = all(abs(float(start[op]) - rs_start[op]) < 1e-6 for op in unc)
+    return {'ok': True, 'reason': '', 'exact': bool(exact),
+            'assigned_mch': asg, 'start': start, 'end': end,
+            'makespan': int(end.max())}
+
+
 # ---------------------------------------------------------------------------
 # THE CORE DELIVERABLE: prefix-respecting residual CP-SAT model.
 # ---------------------------------------------------------------------------
 
 def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
                          mk_coef=1, pen_coef=0, assigned_orig=None,
-                         starts_orig=None):
+                         starts_orig=None, num_workers=0, hint=None,
+                         hint_check=True):
     """Re-solve the RESIDUAL with CP-SAT honoring the committed prefix.
+
+    jl / pt / perturbed_time_lag describe the REALIZED instance (for the new
+    disruption types: disrupt['jl'], disrupt['pt'], disrupt['time_lag']).
+    disrupt['op_release'] (optional) adds start >= ceil(release) per
+    uncommitted op (material_shortage). assigned_orig / starts_orig are in the
+    realized indexing; an entry assigned_orig[op] < 0 (an op added by
+    urgent_arrival) carries no stability penalty. num_workers > 0 caps the
+    CP-SAT search workers (0 = solver default).
 
     STABILITY-AWARE OPTION: when
     ``pen_coef > 0`` the objective becomes ``mk_coef*makespan +
@@ -435,6 +659,16 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
     ``w = pen_coef / mk_coef`` hours per nervousness unit. With the default
     ``pen_coef=0`` the objective and every variable are IDENTICAL to the
     makespan-only model, so existing callers are bit-unchanged.
+
+    WARM START (``hint``): a dict from right_shift_hint() with the integer
+    machine 'assigned_mch' and 'start' of every op. Every variable of every
+    UNCOMMITTED op (start, end, duration, machine presence literals and the
+    optional per-machine intervals) and the makespan get model.AddHint; the
+    committed ops are fixed already. With ``hint_check`` the hint is first
+    verified by a separate, untimed solve with
+    fix_variables_to_their_hinted_value; a hint that this check does not find
+    feasible is cleared and the timed solve starts cold. The timed solve's
+    parameters are unchanged. hint=None (default) adds nothing.
 
     Mirrors ortools_solver.fjsp_solver structure (alternative intervals,
     AddNoOverlap per machine, finish-start lag precedence), but:
@@ -453,7 +687,9 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
     Returns dict:
       objective (float), seconds (float), status (str),
       assigned_mch (int[N]), op_ct (float[N]) -- TRUE units,
-      t_disrupt_int (int), downtime_int (None|int), broken_mch (None|int).
+      t_disrupt_int (int), downtime_int (None|int), broken_mch (None|int),
+      timing (dict) -- the solve's contention evidence (wall and CPU seconds,
+      workers, cpu_share, status, hit_limit; see eval_stochastic_lags).
     """
     from ortools.sat.python import cp_model
 
@@ -491,6 +727,14 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
     if disrupt['downtime_true'] is not None:
         downtime_int = int(round(disrupt['downtime_true']))
         horizon += downtime_int
+    op_release = disrupt.get('op_release')
+    release_int = {}
+    if op_release is not None:
+        for op in range(n_ops):
+            if not committed[op] and float(op_release[op]) > t_disrupt_int:
+                release_int[op] = int(math.ceil(float(op_release[op]) - 1e-9))
+        if release_int:
+            horizon += max(release_int.values()) - t_disrupt_int
     horizon = max(horizon, 1)
 
     model = cp_model.CpModel()
@@ -498,6 +742,9 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
     starts = {}   # op -> start IntVar
     ends = {}     # op -> end IntVar
     presences = {}  # (op, m) -> BoolVar (for uncommitted ops over machines)
+    durs = {}       # op -> duration IntVar (uncommitted ops)
+    alts = {}       # (op, m) -> (l_start, l_end, l_dur) of the optional interval
+    fixed_end = {}  # committed op -> its fixed integer end
 
     for op in range(n_ops):
         if committed[op]:
@@ -511,6 +758,7 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
                 e_val = s_val + max(1, int(true_pt[op, m]))
             start = model.NewIntVar(s_val, s_val, f'start_op{op}')
             end = model.NewIntVar(e_val, e_val, f'end_op{op}')
+            fixed_end[op] = e_val
             dur = e_val - s_val
             interval = model.NewIntervalVar(start, dur, end, f'iv_op{op}')
             starts[op] = start
@@ -527,6 +775,7 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
             model.NewIntervalVar(start, dur, end, f'iv_op{op}')
             starts[op] = start
             ends[op] = end
+            durs[op] = dur
             if len(able) > 1:
                 l_pres = []
                 for m in able:
@@ -544,6 +793,7 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
                     model.Add(end == l_end).OnlyEnforceIf(pres)
                     intervals_per_machine[m].append(l_iv)
                     presences[(op, m)] = pres
+                    alts[(op, m)] = (l_start, l_end, l_dur)
                     l_pres.append(pres)
                 model.AddExactlyOne(l_pres)
             else:
@@ -560,6 +810,10 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
         for k in range(s + 1, e):
             pred = k - 1
             model.Add(starts[k] >= ends[pred] + int(lag[pred]))
+
+    # --- per-op release floors (material_shortage) ---------------------------
+    for op, r in release_int.items():
+        model.Add(starts[op] >= r)
 
     # --- breakdown: fixed unavailable interval on the broken machine ---------
     # The outage is [t_disrupt, t_disrupt + downtime]. BUT a committed op already
@@ -609,7 +863,7 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
             'penalized solve needs assigned_orig and starts_orig'
         pen_terms = []
         for op in range(n_ops):
-            if committed[op]:
+            if committed[op] or int(assigned_orig[op]) < 0:
                 continue
             able = np.where(true_pt[op] > 0)[0]
             orig_m = int(assigned_orig[op])
@@ -630,11 +884,65 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
     else:
         model.Minimize(makespan)
 
+    # --- optional warm start from a feasible plan (e.g. the right-shift) ----
+    hint_given = False
+    hint_check_status = None
+    hint_check_seconds = float('nan')
+    hint_makespan = float('nan')
+    if hint is not None:
+        h_asg = np.asarray(hint['assigned_mch'], dtype=int)
+        h_start = np.asarray(hint['start'], dtype=np.int64)
+        h_end_all = []
+        for op in range(n_ops):
+            if committed[op]:
+                h_end_all.append(fixed_end[op])
+                continue
+            m_h = int(h_asg[op])
+            s_h = int(h_start[op])
+            d_h = int(true_pt[op, m_h])
+            model.AddHint(starts[op], s_h)
+            model.AddHint(ends[op], s_h + d_h)
+            model.AddHint(durs[op], d_h)
+            h_end_all.append(s_h + d_h)
+            able = np.where(true_pt[op] > 0)[0]
+            if len(able) > 1:
+                for m in able:
+                    m = int(m)
+                    l_start, l_end, l_dur = alts[(op, m)]
+                    on = (m == m_h)
+                    model.AddHint(presences[(op, m)], 1 if on else 0)
+                    # an absent optional interval is unconstrained; give it
+                    # the same start, clamped to its domain
+                    ls = min(max(s_h, t_disrupt_int), horizon)
+                    model.AddHint(l_start, s_h if on else ls)
+                    model.AddHint(l_end, s_h + d_h if on
+                                  else min(ls + l_dur, horizon))
+        hint_makespan = float(max(h_end_all))
+        model.AddHint(makespan, int(hint_makespan))
+        hint_given = True
+        if hint_check:
+            chk = cp_model.CpSolver()
+            chk.parameters.fix_variables_to_their_hinted_value = True
+            chk.parameters.max_time_in_seconds = 30.0
+            if num_workers:
+                chk.parameters.num_workers = int(num_workers)
+            t_chk = time.time()
+            st = chk.Solve(model)
+            hint_check_seconds = time.time() - t_chk
+            hint_check_status = chk.StatusName(st)
+            if st not in (cp_model.OPTIMAL, cp_model.FEASIBLE) or \
+                    abs(chk.ObjectiveValue() - hint_makespan) > 1e-6:
+                model.ClearHints()
+                hint_given = False
+
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(budget)
-    t1 = time.time()
-    status = solver.Solve(model)
-    t2 = time.time()
+    if num_workers:
+        solver.parameters.num_workers = int(num_workers)
+    with SolveClock() as clk:
+        t1 = time.time()
+        status = solver.Solve(model)
+        t2 = time.time()
 
     assigned_mch = np.full(n_ops, -1, dtype=int)
     op_ct = np.zeros(n_ops, dtype=float)
@@ -668,6 +976,11 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
         'outage_start_int': outage_start_int,
         'outage_end_int': outage_end_int,
         'committed': committed,
+        'timing': cpsat_timing(solver, status, clk),
+        'hint_given': hint_given,
+        'hint_check_status': hint_check_status,
+        'hint_check_seconds': hint_check_seconds,
+        'hint_makespan': hint_makespan,
     }
 
 
@@ -764,8 +1077,29 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
                'mch_nerv': np.full(n, np.nan),
                'time_nerv': np.full(n, np.nan),
                'comb_nerv': np.full(n, np.nan),
+               'abs_shift': np.full(n, np.nan),
                'feasible': np.zeros(n, dtype=bool)}
            for m in methods}
+    # contention evidence per (instance, method); the CP-SAT arms also keep
+    # their single solve's wall/CPU seconds, workers, cpu_share and status
+    for m in methods:
+        rec[m].update(contention_arrays(n, per_solve=m in cpsat_names))
+    use_hint = getattr(args, 'hint', 'none') == 'right_shift'
+    if use_hint:
+        # warm-start evidence per (instance, CP-SAT arm)
+        for m in cpsat_names:
+            rec[m].update({
+                'hint_given': np.zeros(n, dtype=bool),
+                'hint_exact_rs': np.zeros(n, dtype=bool),
+                'hint_check_status': np.array([''] * n, dtype=object),
+                'hint_check_s': np.full(n, np.nan),
+                'rs_makespan': np.full(n, np.nan),
+                'rs_residual_makespan': np.full(n, np.nan),
+                'hint_makespan': np.full(n, np.nan),
+                'cpsat_makespan': np.full(n, np.nan),
+                'above_rs': np.zeros(n, dtype=bool),
+                'above_hint': np.zeros(n, dtype=bool)})
+    n_hint_failed = 0   # instances solved cold: hint could not be built/checked
     orig_makespans = np.full(n, np.nan)
     # CP-SAT proof status counters per budget
     optimal_count = {b: 0 for b in budgets}
@@ -779,7 +1113,9 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
     print(f'RESIDUAL CP-SAT  model={args.model_name}  dataset={dataset}  '
           f'instances={n}')
     print(f'  disruption={disruption_type}  offset={args.disruption_offset}  '
-          f'lag_factor={args.lag_factor}  budgets(s)={budgets}')
+          f'lag_factor={args.lag_factor}  budgets(s)={budgets}'
+          + (f'  hint={args.hint}' if getattr(args, 'hint', 'none') != 'none'
+             else ''))
     print(f'  use_lag_features={use_lag_features}  '
           f'use_type_embedding={use_type_embedding}  seed_test={args.seed_test}')
     print('=' * 78)
@@ -803,19 +1139,43 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
         # ---- build the disrupted state + capture the committed prefix -------
         disrupt, env, state = build_disrupted_state(
             ppo, jl, pt, meta, use_lag_features, use_type_embedding,
-            disruption_type, args.disruption_offset, args.lag_factor)
+            disruption_type, args.disruption_offset, args.lag_factor,
+            dparams=_dparams(args), stem=stem)
         perturbed_lag = disrupt['perturbed_time_lag']
         mch_ready_time = disrupt['mch_ready_time']
+        # realized instance (identical to the loaded one for lag_perturb and
+        # breakdown except for the perturbed lag)
+        jl_r, pt_r = disrupt['jl'], disrupt['pt']
+        legacy = disrupt['legacy']
+        ER = _import_eval_reactive()
+
+        def _nerv(asg_new, oct_new):
+            return ER.nervousness_mapped(pt, assigned_orig, oct_orig, pt_r,
+                                         asg_new, oct_new, disrupt['op_map'])
+
+        def _contract(name, asg_new, oct_new):
+            nonlocal n_prefix_violations
+            if legacy:
+                return True
+            viol = ER.check_residual_contract(disrupt, asg_new, oct_new)
+            if viol:
+                n_prefix_violations += 1
+                print(f'  !!! {name} RESIDUAL-CONTRACT VIOLATION on {base}: '
+                      f'{viol[:3]}')
+            return not viol
 
         # ---- (a) DRL-reactive: continue the SAME disrupted env --------------
+        la_d = loadavg_now()
         ms_d, sec_d, asg_d, oct_d = drl_reactive_continue(
             ppo, env, state, disrupt['assigned_mch_prefix'].copy())
-        res_d = validate_schedule(jl, pt, perturbed_lag, asg_d, oct_d)
+        store_contention(rec['drl_reactive'], i, [], la_d)
+        res_d = validate_schedule(jl_r, pt_r, perturbed_lag, asg_d, oct_d)
         if not res_d['feasible']:
             n_infeasible += 1
             print(f'  !!! drl_reactive INFEASIBLE on {base}: '
                   f'{res_d["violations"][:3]}')
-        mn, tn, cn = nervousness(pt, assigned_orig, oct_orig, asg_d, oct_d)
+        ok_d = _contract('drl_reactive', asg_d, oct_d)
+        mn, tn, cn, sh = _nerv(asg_d, oct_d)
         rec['drl_reactive']['makespan'][i] = ms_d
         rec['drl_reactive']['inflation'][i] = (
             100.0 * (ms_d - ms_orig) / ms_orig if ms_orig > 0 else 0.0)
@@ -823,17 +1183,24 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
         rec['drl_reactive']['mch_nerv'][i] = mn
         rec['drl_reactive']['time_nerv'][i] = tn
         rec['drl_reactive']['comb_nerv'][i] = cn
-        rec['drl_reactive']['feasible'][i] = res_d['feasible']
+        rec['drl_reactive']['abs_shift'][i] = sh
+        rec['drl_reactive']['feasible'][i] = res_d['feasible'] and ok_d
 
         # ---- (b) right-shift repair -----------------------------------------
-        ms_rs, sec_rs, asg_rs, oct_rs = right_shift_baseline(
-            jl, pt, assigned_orig, oct_orig, perturbed_lag, mch_ready_time)
-        res_rs = validate_schedule(jl, pt, perturbed_lag, asg_rs, oct_rs)
+        store_contention(rec['right_shift'], i, [], loadavg_now())
+        if legacy:
+            ms_rs, sec_rs, asg_rs, oct_rs = right_shift_baseline(
+                jl, pt, assigned_orig, oct_orig, perturbed_lag, mch_ready_time)
+        else:
+            ms_rs, sec_rs, asg_rs, oct_rs = ER.right_shift_residual(
+                disrupt, assigned_orig, oct_orig, pt)
+        res_rs = validate_schedule(jl_r, pt_r, perturbed_lag, asg_rs, oct_rs)
         if not res_rs['feasible']:
             n_infeasible += 1
             print(f'  !!! right_shift INFEASIBLE on {base}: '
                   f'{res_rs["violations"][:3]}')
-        mn, tn, cn = nervousness(pt, assigned_orig, oct_orig, asg_rs, oct_rs)
+        ok_rs = _contract('right_shift', asg_rs, oct_rs)
+        mn, tn, cn, sh = _nerv(asg_rs, oct_rs)
         rec['right_shift']['makespan'][i] = ms_rs
         rec['right_shift']['inflation'][i] = (
             100.0 * (ms_rs - ms_orig) / ms_orig if ms_orig > 0 else 0.0)
@@ -841,13 +1208,63 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
         rec['right_shift']['mch_nerv'][i] = mn
         rec['right_shift']['time_nerv'][i] = tn
         rec['right_shift']['comb_nerv'][i] = cn
-        rec['right_shift']['feasible'][i] = res_rs['feasible']
+        rec['right_shift']['abs_shift'][i] = sh
+        rec['right_shift']['feasible'][i] = res_rs['feasible'] and ok_rs
 
         # ---- (c) PREFIX-RESPECTING RESIDUAL CP-SAT at each budget -----------
+        hint = None
+        ms_rs_res = np.nan
+        if use_hint:
+            # prefix-respecting right-shift (eval_reactive.right_shift_residual)
+            # for reference: for breakdown the legacy right-shift above also
+            # delays committed ops queued on the broken machine
+            ms_rs_res, _, a_rr, c_rr = ER.right_shift_residual(
+                disrupt, assigned_orig, oct_orig, pt)
+            v_rr = validate_schedule(jl_r, pt_r, perturbed_lag, a_rr, c_rr)
+            if not v_rr['feasible'] or ER.check_residual_contract(
+                    disrupt, a_rr, c_rr):
+                print(f'  !!! residual right-shift invalid on {base}')
+                ms_rs_res = np.nan
+            hb = right_shift_hint(jl_r, pt_r, perturbed_lag, disrupt,
+                                  asg_rs, oct_rs)
+            if hb['ok']:
+                hint = hb
+            else:
+                print(f'  !!! right-shift hint not built on {base}: '
+                      f'{hb["reason"]} -> cold solve')
         cp_summ = {}
         for b in budgets:
             mname = f'residual_cpsat_{b}s'
-            res = residual_cpsat_solve(jl, pt, perturbed_lag, disrupt, b)
+            la_c = loadavg_now()
+            res = residual_cpsat_solve(jl_r, pt_r, perturbed_lag, disrupt, b,
+                                       num_workers=args.cpsat_workers,
+                                       hint=hint)
+            store_contention(rec[mname], i, [res['timing']], la_c)
+            if use_hint:
+                r_h = rec[mname]
+                r_h['hint_given'][i] = res['hint_given']
+                r_h['hint_exact_rs'][i] = bool(hint is not None
+                                               and hint['exact'])
+                r_h['hint_check_status'][i] = str(res['hint_check_status'])
+                r_h['hint_check_s'][i] = res['hint_check_seconds']
+                r_h['rs_makespan'][i] = ms_rs
+                r_h['rs_residual_makespan'][i] = ms_rs_res
+                r_h['hint_makespan'][i] = (hint['makespan'] if hint is not None
+                                           else np.nan)
+                if hint is not None and not res['hint_given']:
+                    print(f'  !!! {mname} hint REJECTED by the check on {base} '
+                          f'({res["hint_check_status"]}) -> cold solve')
+                if res['status'] in ('OPTIMAL', 'FEASIBLE'):
+                    r_h['cpsat_makespan'][i] = res['objective']
+                    r_h['above_rs'][i] = res['objective'] > ms_rs + 1e-6
+                    r_h['above_hint'][i] = (
+                        res['hint_given']
+                        and res['objective'] > res['hint_makespan'] + 1e-6)
+                    if r_h['above_rs'][i]:
+                        print(f'  !!! {mname} ends ABOVE right-shift on {base}: '
+                              f'{res["objective"]:.1f} > {ms_rs:.2f} (hint '
+                              f'{r_h["hint_makespan"][i]:.0f}, given '
+                              f'{res["hint_given"]})')
             cp_summ[b] = res
             if res['status'] == 'OPTIMAL':
                 optimal_count[b] += 1
@@ -858,11 +1275,14 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
 
             if res['status'] in ('OPTIMAL', 'FEASIBLE'):
                 # independent feasibility validation vs perturbed lags
-                vres = validate_schedule(jl, pt, perturbed_lag,
+                vres = validate_schedule(jl_r, pt_r, perturbed_lag,
                                          res['assigned_mch'], res['op_ct'])
                 pviol = check_prefix_respected(disrupt, res['assigned_mch'],
                                                res['op_ct'])
-                bviol = check_breakdown_window(res, pt)
+                if not legacy:
+                    pviol = pviol + ER.check_residual_contract(
+                        disrupt, res['assigned_mch'], res['op_ct'], tol=0.51)
+                bviol = check_breakdown_window(res, pt_r)
                 feasible = vres['feasible'] and not pviol and not bviol
                 if not vres['feasible']:
                     n_infeasible += 1
@@ -885,11 +1305,11 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
                     100.0 * (res['objective'] - ms_orig) / ms_orig
                     if ms_orig > 0 else 0.0)
                 rec[mname]['feasible'][i] = feasible
-                mn, tn, cn = nervousness(pt, assigned_orig, oct_orig,
-                                         res['assigned_mch'], res['op_ct'])
+                mn, tn, cn, sh = _nerv(res['assigned_mch'], res['op_ct'])
                 rec[mname]['mch_nerv'][i] = mn
                 rec[mname]['time_nerv'][i] = tn
                 rec[mname]['comb_nerv'][i] = cn
+                rec[mname]['abs_shift'][i] = sh
             else:
                 print(f'  !!! {mname} NO SOLUTION ({res["status"]}) on {base}')
                 rec[mname]['feasible'][i] = False
@@ -900,11 +1320,11 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
             b = budgets[-1]  # the largest budget
             res = cp_summ[b]
             if res['status'] in ('OPTIMAL', 'FEASIBLE'):
-                vres = validate_schedule(jl, pt, perturbed_lag,
+                vres = validate_schedule(jl_r, pt_r, perturbed_lag,
                                          res['assigned_mch'], res['op_ct'])
                 pviol = check_prefix_respected(disrupt, res['assigned_mch'],
                                                res['op_ct'])
-                bviol = check_breakdown_window(res, pt)
+                bviol = check_breakdown_window(res, pt_r)
                 n_committed = int(disrupt['committed'].sum())
                 print(f'  --- SAMPLE CHECK [{base}, {disruption_type}, '
                       f'residual_cpsat_{b}s] ---')
@@ -931,15 +1351,23 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
                 assert not bviol, f'sample {base} ran during outage: {bviol[:3]}'
                 sample_checks_printed += 1
 
+        if use_hint and (hint is None or not all(
+                rec[f'residual_cpsat_{b}s']['hint_given'][i] for b in budgets)):
+            n_hint_failed += 1
+
         # ---- progress line --------------------------------------------------
         cp_str = '  '.join(
-            f'rcp{b}={cp_summ[b]["objective"]:6.0f}h({cp_summ[b]["status"][:4]})'
+            f'rcp{b}={cp_summ[b]["objective"]:6.0f}h({cp_summ[b]["status"][:4]},'
+            f'cpu{cp_summ[b]["timing"]["cpu_share"]:.2f})'
             for b in budgets)
         print(f'  [{i + 1:3d}/{n}] {base}  orig={ms_orig:6.0f}h  '
               f'drl={ms_d:6.0f}h(+{rec["drl_reactive"]["inflation"][i]:4.1f}%,'
               f'{sec_d:.2f}s)  rs={ms_rs:6.0f}h(+'
               f'{rec["right_shift"]["inflation"][i]:5.1f}%)  {cp_str}'
-              f'   [{disrupt["info"]}]')
+              + (f'  hint={hint["makespan"] if hint is not None else "-"}'
+                 f'{"(exact)" if hint is not None and hint["exact"] else ""}'
+                 if use_hint else '')
+              + f'   [{disrupt["info"]}]')
 
     # ---- HARD GATE: stop loudly if any prefix/window violation occurred -----
     if n_prefix_violations or n_breakdown_window_violations:
@@ -965,13 +1393,17 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
             'mch_nerv': _mean(rec[m]['mch_nerv']),
             'time_nerv': _mean(rec[m]['time_nerv']),
             'comb_nerv': _mean(rec[m]['comb_nerv']),
+            'abs_shift': _mean(rec[m]['abs_shift']),
             'feasible': int(rec[m]['feasible'].sum()),
         }
+    contention = {m: contention_summary(rec[m]) for m in methods}
 
     # ---- save structured npy ------------------------------------------------
-    save_dir = f'./test_results/PPVC/{dataset}'
+    save_dir = args.out_dir or f'./test_results/PPVC/{dataset}'
     os.makedirs(save_dir, exist_ok=True)
-    out_npy = os.path.join(save_dir, f'residual_cpsat_{disruption_type}.npy')
+    from common_utils import backbone_file_tag
+    btag = backbone_file_tag(args.model_name, configs.framework)
+    out_npy = os.path.join(save_dir, f'residual_cpsat_{disruption_type}{btag}.npy')
     payload = {
         'methods': methods,
         'orig_makespans': orig_makespans,
@@ -985,14 +1417,38 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
             'disruption_type': disruption_type,
             'disruption_offset': args.disruption_offset,
             'lag_factor': args.lag_factor,
+            'pt_factor': args.pt_factor,
+            'shortage_factor': args.shortage_factor,
+            'shortage_basis': args.shortage_basis,
             'cpsat_budgets': budgets,
+            'cpsat_workers': args.cpsat_workers,
             'seed_test': args.seed_test,
             'n_instances': n,
             'n_infeasible': n_infeasible,
             'n_prefix_violations': n_prefix_violations,
             'n_breakdown_window_violations': n_breakdown_window_violations,
+            'low_cpu_share': LOW_CPU_SHARE,
+            'hit_limit_frac': HIT_LIMIT_FRAC,
         },
+        'contention': contention,
     }
+    hint_stats = None
+    if use_hint:
+        hint_stats = {}
+        for m in cpsat_names:
+            r = rec[m]
+            hint_stats[m] = {
+                'n_hint_given': int(r['hint_given'].sum()),
+                'n_hint_exact_rs': int(r['hint_exact_rs'].sum()),
+                'n_above_rs': int(r['above_rs'].sum()),
+                'n_above_hint': int(r['above_hint'].sum()),
+                'mean_rs_makespan': _mean(r['rs_makespan']),
+                'mean_rs_residual_makespan': _mean(r['rs_residual_makespan']),
+                'mean_hint_makespan': _mean(r['hint_makespan']),
+                'mean_cpsat_makespan': _mean(r['cpsat_makespan'])}
+        payload['meta']['hint'] = 'right_shift'
+        payload['meta']['n_hint_failed'] = n_hint_failed
+        payload['hint_stats'] = hint_stats
     np.save(out_npy, payload, allow_pickle=True)
 
     # ---- console summary ----------------------------------------------------
@@ -1002,13 +1458,13 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
     print('=' * 78)
     print(f'  mean ORIGINAL DRL makespan: {_mean(orig_makespans):.1f} h')
     print(f'{"method":<20}{"makespan":>10}{"infl%":>9}{"time(s)":>10}'
-          f'{"mNerv":>8}{"tNerv":>8}{"cNerv":>8}{"feas":>9}')
+          f'{"mNerv":>8}{"tNerv":>8}{"cNerv":>8}{"shift":>8}{"feas":>9}')
     for m in methods:
         a = agg[m]
         print(f'{m:<20}{a["makespan"]:>10.1f}{a["inflation"]:>9.2f}'
               f'{a["seconds"]:>10.3f}{a["mch_nerv"]:>8.1f}'
               f'{a["time_nerv"]:>8.1f}{a["comb_nerv"]:>8.1f}'
-              f'{a["feasible"]:>6}/{n}')
+              f'{a["abs_shift"]:>8.2f}{a["feasible"]:>6}/{n}')
     print('-' * 78)
     print('  CP-SAT proof status per budget:')
     for b in budgets:
@@ -1019,6 +1475,22 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
     print(f'  total prefix violations: {n_prefix_violations}')
     print(f'  total breakdown-window violations: '
           f'{n_breakdown_window_violations}')
+    for m in cpsat_names:
+        c = contention[m]
+        print(f'  contention {m}: min cpu_share '
+              f'{c["cpu_share_min"]}  budget-limited {c["n_hit_limit"]}/'
+              f'{c["n_timed_solves"]}  cpu_share<{LOW_CPU_SHARE} '
+              f'{c["n_low_share"]}')
+    if use_hint:
+        print(f'  right-shift hint: instances solved cold = {n_hint_failed}')
+        for m in cpsat_names:
+            h = hint_stats[m]
+            print(f'  hint {m}: given {h["n_hint_given"]}/{n}  exact right-'
+                  f'shift times {h["n_hint_exact_rs"]}/{n}  above right-shift '
+                  f'{h["n_above_rs"]}  above hint {h["n_above_hint"]}  mean '
+                  f'rs {h["mean_rs_makespan"]:.2f} hint '
+                  f'{h["mean_hint_makespan"]:.2f} cpsat '
+                  f'{h["mean_cpsat_makespan"]:.2f}')
     print(f'  saved {out_npy}')
     print('=' * 78)
 
@@ -1056,30 +1528,57 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
     lines.append(f'- checkpoint: `{ckpt_path}`')
     lines.append(f'- disruption: **{disruption_type}**  '
                  f'offset={args.disruption_offset}  '
-                 f'lag_factor={args.lag_factor}')
-    lines.append(f'- budgets (s): {budgets}')
+                 f'lag_factor={args.lag_factor}  pt_factor={args.pt_factor}  '
+                 f'shortage={args.shortage_factor} x {args.shortage_basis}')
+    lines.append(f'- budgets (s): {budgets}  (num_workers='
+                 f'{args.cpsat_workers or "default"})')
+    if use_hint:
+        lines.append('- warm start: right-shift plan as CP-SAT solution hint '
+                     f'(instances solved cold: {n_hint_failed})')
     lines.append(f'- mean ORIGINAL DRL makespan: {_mean(orig_makespans):.1f} h')
     lines.append(f'- total validator-infeasibilities: {n_infeasible}')
     lines.append(f'- total prefix violations: {n_prefix_violations}')
     lines.append(f'- total breakdown-window violations: '
                  f'{n_breakdown_window_violations}\n')
     lines.append('| method | mean makespan (h) | mean inflation % | '
-                 'mean time (s) | mch-nerv | time-nerv | comb-nerv | feasible |')
-    lines.append('|---|---|---|---|---|---|---|---|')
+                 'mean time (s) | mch-nerv | time-nerv | comb-nerv | '
+                 'abs-shift (h) | feasible |')
+    lines.append('|---|---|---|---|---|---|---|---|---|')
     for m in methods:
         a = agg[m]
         lines.append(f'| {m} | {a["makespan"]:.1f} | {a["inflation"]:.2f} | '
                      f'{a["seconds"]:.4f} | {a["mch_nerv"]:.1f} | '
                      f'{a["time_nerv"]:.1f} | {a["comb_nerv"]:.1f} | '
-                     f'{a["feasible"]}/{n} |')
+                     f'{a["abs_shift"]:.2f} | {a["feasible"]}/{n} |')
     lines.append('')
     lines.append('| budget (s) | OPTIMAL | FEASIBLE-only | no-solution |')
     lines.append('|---|---|---|---|')
     for b in budgets:
         lines.append(f'| {b} | {optimal_count[b]} | '
                      f'{feasible_only_count[b]} | {no_sol_count[b]} |')
+    lines.append('')
+    lines += contention_table({m: contention[m] for m in cpsat_names})
+    if use_hint:
+        lines.append('')
+        lines.append('Warm start: the hint is the right-shift plan retimed to '
+                     'the integer residual model; "above" counts solves whose '
+                     'makespan exceeds the right-shift makespan or the hint '
+                     'makespan.')
+        lines.append('')
+        lines.append('| method | hint given | hint = right-shift times | '
+                     'mean right-shift (h) | mean hint (h) | mean CP-SAT (h) | '
+                     'above right-shift | above hint |')
+        lines.append('|---|---|---|---|---|---|---|---|')
+        for m in cpsat_names:
+            h = hint_stats[m]
+            lines.append(f'| {m} | {h["n_hint_given"]}/{n} | '
+                         f'{h["n_hint_exact_rs"]}/{n} | '
+                         f'{h["mean_rs_makespan"]:.2f} | '
+                         f'{h["mean_hint_makespan"]:.2f} | '
+                         f'{h["mean_cpsat_makespan"]:.2f} | '
+                         f'{h["n_above_rs"]} | {h["n_above_hint"]} |')
     md_path = os.path.join(save_dir,
-                           f'residual_cpsat_{disruption_type}_summary.md')
+                           f'residual_cpsat_{disruption_type}{btag}_summary.md')
     with open(md_path, 'w') as f:
         f.write('\n'.join(lines) + '\n')
     print(f'\nwrote {md_path}')
@@ -1098,6 +1597,7 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
         'n_infeasible': n_infeasible,
         'n_prefix_violations': n_prefix_violations,
         'n_breakdown_window_violations': n_breakdown_window_violations,
+        'contention': contention,
     }
 
 
@@ -1129,6 +1629,9 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
              'sec': [], 'optimal': 0, 'feas': 0} for w in weights}
     drl = {'infl': [], 'nerv': [], 'mch_nerv': [], 'time_nerv': [], 'sec': [],
            'feas': 0}
+    # contention evidence of every penalized solve, one record per
+    # (instance, weight), including solves whose result is then discarded
+    T = {w: [] for w in weights}
     orig_ms = []
 
     print('=' * 78)
@@ -1151,46 +1654,68 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
 
         disrupt, env, state = build_disrupted_state(
             ppo, jl, pt, meta, use_lag_features, use_type_embedding,
-            disruption_type, args.disruption_offset, args.lag_factor)
+            disruption_type, args.disruption_offset, args.lag_factor,
+            dparams=_dparams(args), stem=stem)
         perturbed_lag = disrupt['perturbed_time_lag']
+        jl_r, pt_r = disrupt['jl'], disrupt['pt']
+        ER = _import_eval_reactive()
+        # original plan in the realized indexing (-1 / NaN for added ops)
+        op_map = np.asarray(disrupt['op_map'], dtype=int)
+        n_r = pt_r.shape[0]
+        asg_orig_r = np.full(n_r, -1, dtype=int)
+        starts_orig_r = np.full(n_r, np.nan)
+        keep = op_map >= 0
+        asg_orig_r[op_map[keep]] = assigned_orig[keep]
+        starts_orig_r[op_map[keep]] = starts_orig[keep]
+
+        def _nerv(asg_new, oct_new):
+            return ER.nervousness_mapped(pt, assigned_orig, oct_orig, pt_r,
+                                         asg_new, oct_new, op_map)[:3]
 
         # ---- DRL-reactive operating point -----------------------------------
         ms_d, sec_d, asg_d, oct_d = drl_reactive_continue(
             ppo, env, state, disrupt['assigned_mch_prefix'].copy())
-        rd = validate_schedule(jl, pt, perturbed_lag, asg_d, oct_d)
+        rd = validate_schedule(jl_r, pt_r, perturbed_lag, asg_d, oct_d)
         if rd['feasible']:
             drl['feas'] += 1
         else:
             print(f'  !!! drl_reactive INFEASIBLE on {base}')
-        mn, tn, cn = nervousness(pt, assigned_orig, oct_orig, asg_d, oct_d)
+        mn, tn, cn = _nerv(asg_d, oct_d)
         drl['infl'].append(100.0 * (ms_d - ms_orig) / ms_orig)
         drl['nerv'].append(cn); drl['mch_nerv'].append(mn)
         drl['time_nerv'].append(tn); drl['sec'].append(sec_d)
 
         # ---- penalized residual CP-SAT at each weight -----------------------
         for w, (mk, pc) in zip(weights, coefs):
+            la_w = loadavg_now()
             if pc == 0:
-                res = residual_cpsat_solve(jl, pt, perturbed_lag, disrupt,
-                                           budget)
+                res = residual_cpsat_solve(jl_r, pt_r, perturbed_lag, disrupt,
+                                           budget,
+                                           num_workers=args.cpsat_workers)
             else:
-                res = residual_cpsat_solve(jl, pt, perturbed_lag, disrupt,
+                res = residual_cpsat_solve(jl_r, pt_r, perturbed_lag, disrupt,
                                            budget, mk_coef=mk, pen_coef=pc,
-                                           assigned_orig=assigned_orig,
-                                           starts_orig=starts_orig)
+                                           assigned_orig=asg_orig_r,
+                                           starts_orig=starts_orig_r,
+                                           num_workers=args.cpsat_workers)
+            T[w].append({'instance': base, **res['timing'],
+                         **contention_fields([res['timing']], la_w)})
             if res['status'] not in ('OPTIMAL', 'FEASIBLE'):
                 print(f'  !!! w={w} NO SOLUTION on {base} ({res["status"]})')
                 continue
             ms_new = float(np.max(res['op_ct']))
-            vres = validate_schedule(jl, pt, perturbed_lag,
+            vres = validate_schedule(jl_r, pt_r, perturbed_lag,
                                      res['assigned_mch'], res['op_ct'])
             pviol = check_prefix_respected(disrupt, res['assigned_mch'],
                                            res['op_ct'])
+            if not disrupt['legacy']:
+                pviol = pviol + ER.check_residual_contract(
+                    disrupt, res['assigned_mch'], res['op_ct'], tol=0.51)
             if not vres['feasible'] or pviol:
                 print(f'  !!! w={w} INVALID on {base}: feas={vres["feasible"]} '
                       f'prefix_viol={len(pviol)}')
                 continue
-            mn, tn, cn = nervousness(pt, assigned_orig, oct_orig,
-                                     res['assigned_mch'], res['op_ct'])
+            mn, tn, cn = _nerv(res['assigned_mch'], res['op_ct'])
             W[w]['infl'].append(100.0 * (ms_new - ms_orig) / ms_orig)
             W[w]['nerv'].append(cn); W[w]['mch_nerv'].append(mn)
             W[w]['time_nerv'].append(tn); W[w]['sec'].append(res['seconds'])
@@ -1219,6 +1744,12 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
               f'{_m(d["nerv"]):>9.1f}{_m(d["mch_nerv"]):>7.1f}'
               f'{_m(d["time_nerv"]):>7.1f}{_m(d["sec"]):>9.3f}'
               f'{(str(d["optimal"]) + "/" + str(d["feas"])):>8}')
+    contention = {w: contention_summary(T[w]) for w in weights}
+    for w in weights:
+        c = contention[w]
+        print(f'  contention w={w}: min cpu_share {c["cpu_share_min"]}  '
+              f'budget-limited {c["n_hit_limit"]}/{c["n_timed_solves"]}  '
+              f'cpu_share<{LOW_CPU_SHARE} {c["n_low_share"]}')
 
     payload = {
         'disruption_type': disruption_type, 'n': n, 'weights': weights,
@@ -1229,11 +1760,18 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
                              else [float(x) for x in W[w][k]])
                          for k in W[w]} for w in weights},
         'meta': {'offset': args.disruption_offset,
-                 'lag_factor': args.lag_factor, 'seed_test': args.seed_test},
+                 'lag_factor': args.lag_factor, 'seed_test': args.seed_test,
+                 'cpsat_workers': args.cpsat_workers,
+                 'low_cpu_share': LOW_CPU_SHARE,
+                 'hit_limit_frac': HIT_LIMIT_FRAC},
+        'timing': T,
+        'contention': contention,
     }
-    outdir = f'test_results/PPVC/{dataset}'
+    outdir = args.out_dir or f'test_results/PPVC/{dataset}'
     os.makedirs(outdir, exist_ok=True)
-    out = f'{outdir}/stability_sweep_{disruption_type}.npy'
+    from common_utils import backbone_file_tag
+    btag = backbone_file_tag(args.model_name, configs.framework)
+    out = f'{outdir}/stability_sweep_{disruption_type}{btag}.npy'
     np.save(out, payload, allow_pickle=True)
     print(f'\n[saved] {out}')
     return payload
@@ -1276,8 +1814,11 @@ def main():
 
     if args.disruption_type == 'both':
         disruptions = ['lag_perturb', 'breakdown']
+    elif args.disruption_type == 'all':
+        disruptions = ['lag_perturb', 'breakdown', 'urgent_arrival',
+                       'material_shortage', 'pt_deviation', 'cancellation']
     else:
-        disruptions = [args.disruption_type]
+        disruptions = args.disruption_type.split(',')
 
     if args.stability_sweep:
         weights = [float(x) for x in args.stability_weights.split(',')

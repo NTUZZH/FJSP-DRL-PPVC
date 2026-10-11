@@ -58,9 +58,27 @@ def parse_cli():
                     help='directory with instance_*.fjs + .meta.json')
     ap.add_argument('--methods', nargs='+', default=None,
                     help='subset of: greedy sampling FIFO MOR SPT MWKR '
-                         '(default: greedy + the four PDRs)')
+                         'SPTL LLF MWKRL LRPTL '
+                         '(default: greedy + the four classic PDRs)')
+    ap.add_argument('--out_tag', type=str, default=None,
+                    help='label used in the output file names '
+                         '(Result_<method>+<tag>_<dataset>.npy and '
+                         'summary_<tag>.md); default: --model_name')
     ap.add_argument('--sample_times', type=int, default=100)
     ap.add_argument('--seed_test', type=int, default=50)
+    ap.add_argument('--device', type=str, default=None,
+                    help="override the network device (e.g. 'cpu'); "
+                         "default: params.py's --device")
+    ap.add_argument('--max_instances', type=int, default=0,
+                    help='evaluate only the first N instances (0 = all)')
+    ap.add_argument('--save_dir', type=str, default=None,
+                    help='output directory for the npy and summary files; '
+                         'default: test_results/PPVC/<dataset>')
+    ap.add_argument('--route_variant', type=str, default='auto',
+                    choices=['auto', 'fixed', 'variable'],
+                    help="module routes of the dataset: 'variable' rolls out in "
+                         "FJSPEnvForVariousOpNums; 'auto' reads route_variant from "
+                         "<data_path>/dataset_meta.json (absent key = fixed)")
     args = ap.parse_args()
     # scrub argv so params.py's import-time parse_args() sees a clean argv
     sys.argv = [sys.argv[0]]
@@ -74,7 +92,7 @@ _ARGS = parse_cli()
 # that reads them.
 from params import configs
 
-PDR_METHODS = ('FIFO', 'MOR', 'SPT', 'MWKR')
+PDR_METHODS = ('FIFO', 'MOR', 'SPT', 'MWKR', 'SPTL', 'LLF', 'MWKRL', 'LRPTL')
 MODEL_METHODS = ('greedy', 'sampling')
 
 # Architecture-critical keys copied from the training-config snapshot into
@@ -89,6 +107,10 @@ ARCH_KEYS = (
     'num_mlp_layers_actor', 'hidden_dim_actor',
     'num_mlp_layers_critic', 'hidden_dim_critic',
     'dropout_prob',
+    'framework',
+    # not a shape flag: the lower-bound variant the policy was trained with
+    # (it enters the op features), applied to the model rollouts only
+    'bound_lag_free',
 )
 
 
@@ -107,6 +129,10 @@ def load_train_config(model_name):
     for k in ARCH_KEYS:
         if k in snap:
             setattr(configs, k, snap[k])
+    # snapshots written before --framework existed are DANIEL
+    configs.framework = snap.get('framework', 'DANIEL')
+    from common_utils import check_backbone_tag
+    check_backbone_tag(model_name, configs.framework)
     return snap
 
 
@@ -124,10 +150,46 @@ def list_instances(data_path):
 # times so the schedule can be re-validated with the TRUE lags.
 # ---------------------------------------------------------------------------
 
-def _new_env(jl, pt, meta, use_lag_features, use_type_embedding):
+ROUTE_VARIANT = 'fixed'   # set in main() from --route_variant / dataset_meta.json
+
+
+def detect_route_variant(data_path, cli_value):
+    """Return 'fixed' or 'variable' for the dataset under data_path."""
+    if cli_value != 'auto':
+        return cli_value
+    meta_path = os.path.join(data_path, 'dataset_meta.json')
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            return json.load(f).get('route_variant', 'fixed')
+    return 'fixed'
+
+
+def _make_env(n_j, n_m, use_lag_features, bound_lag_free=False):
+    """Environment for the dataset's route variant: variable routes (modules
+    with different op counts) use FJSPEnvForVariousOpNums, fixed routes the
+    original FJSPEnvForSameOpNums. bound_lag_free selects the lag-free
+    lower bound (fixed routes only)."""
+    if ROUTE_VARIANT == 'variable':
+        if bound_lag_free:
+            sys.exit('[eval_ppvc] bound_lag_free is not wired for variable routes')
+        from fjsp_env_various_op_nums import FJSPEnvForVariousOpNums
+        return FJSPEnvForVariousOpNums(n_j=n_j, n_m=n_m,
+                                       use_lag_features=use_lag_features,
+                                       isolate_padding=True)
     from fjsp_env_same_op_nums import FJSPEnvForSameOpNums
-    env = FJSPEnvForSameOpNums(n_j=jl.shape[0], n_m=pt.shape[1],
-                               use_lag_features=use_lag_features)
+    return FJSPEnvForSameOpNums(n_j=n_j, n_m=n_m,
+                                use_lag_features=use_lag_features,
+                                bound_lag_free=bound_lag_free)
+
+
+def _model_bound_lag_free():
+    """Lower-bound variant of the loaded model (set from its snapshot)."""
+    return bool(getattr(configs, 'bound_lag_free', False))
+
+
+def _new_env(jl, pt, meta, use_lag_features, use_type_embedding,
+             bound_lag_free=False):
+    env = _make_env(jl.shape[0], pt.shape[1], use_lag_features, bound_lag_free)
     kwargs = dict(time_lag_list=[meta['time_lag']])
     if use_type_embedding:
         kwargs['op_type_list'] = [meta['op_type']]
@@ -167,7 +229,8 @@ def rollout_greedy(ppo, jl, pt, meta, use_lag_features, use_type_embedding):
     from common_utils import greedy_select_action
     M = pt.shape[1]
     n_ops = pt.shape[0]
-    env, state = _new_env(jl, pt, meta, use_lag_features, use_type_embedding)
+    env, state = _new_env(jl, pt, meta, use_lag_features, use_type_embedding,
+                          bound_lag_free=_model_bound_lag_free())
     assigned_mch = np.full(n_ops, -1, dtype=int)
     t1 = time.time()
     while True:
@@ -207,9 +270,7 @@ def rollout_sampling(ppo, jl, pt, meta, use_lag_features, use_type_embedding,
     from common_utils import sample_action
     M = pt.shape[1]
     n_ops = pt.shape[0]
-    from fjsp_env_same_op_nums import FJSPEnvForSameOpNums
-    env = FJSPEnvForSameOpNums(n_j=jl.shape[0], n_m=M,
-                               use_lag_features=use_lag_features)
+    env = _make_env(jl.shape[0], M, use_lag_features, _model_bound_lag_free())
     jl_b = np.tile(np.expand_dims(jl, 0), (sample_times, 1))
     pt_b = np.tile(np.expand_dims(pt, 0), (sample_times, 1, 1))
     kwargs = dict(time_lag_list=[meta['time_lag']] * sample_times)
@@ -302,8 +363,17 @@ def main():
 
     # 1) apply the training-config architecture flags BEFORE building anything
     snap = load_train_config(args.model_name)
+    if args.out_tag:
+        # a custom output label must carry the same backbone tag as the model
+        from common_utils import check_backbone_tag
+        check_backbone_tag(args.out_tag, configs.framework)
     use_lag_features = bool(getattr(configs, 'use_lag_features', False))
     use_type_embedding = bool(getattr(configs, 'use_type_embedding', False))
+    if not need_model:
+        # dispatching rules never touch the network: stay on the CPU
+        configs.device = 'cpu'
+    if args.device:
+        configs.device = args.device
 
     # torch + device setup (torch>=2.3 API, mirroring train.py). Must happen
     # AFTER CUDA_VISIBLE_DEVICES is set and BEFORE the network is built.
@@ -330,8 +400,13 @@ def main():
     # 2) collect instances
     from ppvc_instance_generator import load_instance
     stems = list_instances(args.data_path)
+    if args.max_instances > 0:
+        stems = stems[:args.max_instances]
     n = len(stems)
     dataset = os.path.basename(os.path.normpath(args.data_path))
+    global ROUTE_VARIANT
+    ROUTE_VARIANT = detect_route_variant(args.data_path, args.route_variant)
+    print(f'  route_variant={ROUTE_VARIANT}')
 
     from schedule_validator import validate_schedule
 
@@ -342,8 +417,10 @@ def main():
     print('=' * 70)
     print(f'eval_ppvc  model={args.model_name}  dataset={dataset}  '
           f'instances={n}')
-    print(f'  use_lag_features={use_lag_features}  '
+    print(f'  framework={configs.framework}  '
+          f'use_lag_features={use_lag_features}  '
           f'use_type_embedding={use_type_embedding}  '
+          f'bound_lag_free={_model_bound_lag_free()}  '
           f'seed_test={args.seed_test}')
     print(f'  methods={methods}'
           + (f'  sample_times={args.sample_times}' if 'sampling' in methods
@@ -385,11 +462,12 @@ def main():
                 f'{m}={results[m][i, 0]:.0f}h' for m in methods))
 
     # 3) save per-method npy (mirror test_trained_model naming)
-    save_dir = f'./test_results/PPVC/{dataset}'
+    save_dir = args.save_dir or f'./test_results/PPVC/{dataset}'
     os.makedirs(save_dir, exist_ok=True)
     for method in methods:
         out = os.path.join(
-            save_dir, f'Result_{method}+{args.model_name}_{dataset}.npy')
+            save_dir, f'Result_{method}+{args.out_tag or args.model_name}'
+                      f'_{dataset}.npy')
         np.save(out, results[method])
         print(f'  saved {out}')
 
@@ -405,11 +483,14 @@ def main():
                  + ('  ' if 'sampling' not in methods
                     else f'  |  sample_times: {args.sample_times}'))
     lines.append(f'- architecture (from snapshot): '
+                 f'framework={configs.framework}, '
                  f'use_lag_features={use_lag_features}, '
                  f'use_type_embedding={use_type_embedding}, '
                  f'fea_j_input_dim={getattr(configs, "fea_j_input_dim", "?")}, '
                  f'n_op_types={getattr(configs, "n_op_types", "?")}, '
-                 f'n_mch_types={getattr(configs, "n_mch_types", "?")}')
+                 f'n_mch_types={getattr(configs, "n_mch_types", "?")}'
+                 + (', bound_lag_free=True (model rollouts)'
+                    if _model_bound_lag_free() else ''))
 
     if ref:
         cov = sum(1 for b in bases if b in ref)
@@ -447,7 +528,8 @@ def main():
         summary_print.append((method, mean_ms, std_ms, mean_t,
                               feas[method], gap_str))
 
-    summary_path = os.path.join(save_dir, f'summary_{args.model_name}.md')
+    summary_path = os.path.join(
+        save_dir, f'summary_{args.out_tag or args.model_name}.md')
     with open(summary_path, 'w') as f:
         f.write('\n'.join(lines) + '\n')
 

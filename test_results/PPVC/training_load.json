@@ -1,0 +1,92 @@
+[
+ {
+  "dataset": "10x25+ppvc-mixed",
+  "lag_scale": 0.0,
+  "n": 20,
+  "util_mean": 0.26430097037815764,
+  "queue_share": 1.0,
+  "lag_share_cp": 0.0,
+  "makespan": 133.0
+ },
+ {
+  "dataset": "10x25+ppvc-mixed",
+  "lag_scale": 0.25,
+  "n": 20,
+  "util_mean": 0.23183868360744805,
+  "queue_share": 0.5045670833257215,
+  "lag_share_cp": 0.24780518032693505,
+  "makespan": 151.95
+ },
+ {
+  "dataset": "10x25+ppvc-mixed",
+  "lag_scale": 0.5,
+  "n": 20,
+  "util_mean": 0.2060636446050244,
+  "queue_share": 0.3170302919293536,
+  "lag_share_cp": 0.4039047405300612,
+  "makespan": 170.45
+ },
+ {
+  "dataset": "10x25+ppvc-mixed",
+  "lag_scale": 0.75,
+  "n": 20,
+  "util_mean": 0.18309824704191094,
+  "queue_share": 0.20896814525983892,
+  "lag_share_cp": 0.5070010459742573,
+  "makespan": 191.45
+ },
+ {
+  "dataset": "10x25+ppvc-mixed",
+  "lag_scale": 1.0,
+  "n": 20,
+  "util_mean": 0.1623135933060579,
+  "queue_share": 0.14853077579591026,
+  "lag_share_cp": 0.5777043224456998,
+  "makespan": 213.85
+ },
+ {
+  "dataset": "20x25+ppvc-mixed",
+  "lag_scale": 1.0,
+  "n": 20,
+  "util_mean": 0.2664823111936883,
+  "queue_share": 0.3104862873574757,
+  "lag_share_cp": 0.5937447050503495,
+  "makespan": 264.45
+ },
+ {
+  "dataset": "30x25+ppvc-mixed",
+  "lag_scale": 1.0,
+  "n": 20,
+  "util_mean": 0.32491646148011244,
+  "queue_share": 0.4843258834756834,
+  "lag_share_cp": 0.5920332192447523,
+  "makespan": 324.85
+ },
+ {
+  "dataset": "50x25+ppvc-mixed",
+  "lag_scale": 1.0,
+  "n": 20,
+  "util_mean": 0.39217828802220617,
+  "queue_share": 0.6259354832933075,
+  "lag_share_cp": 0.599783065740932,
+  "makespan": 448.6
+ },
+ {
+  "dataset": "80x25+ppvc-mixed",
+  "lag_scale": 1.0,
+  "n": 20,
+  "util_mean": 0.4534095330244493,
+  "queue_share": 0.7331070301313801,
+  "lag_share_cp": 0.6061427591100279,
+  "makespan": 620.2
+ },
+ {
+  "dataset": "10x15+ppvc-mixed",
+  "lag_scale": 1.0,
+  "n": 20,
+  "util_mean": 0.22757198181825206,
+  "queue_share": 0.3605325890359131,
+  "lag_share_cp": 0.5686346489814961,
+  "makespan": 264.7
+ }
+]

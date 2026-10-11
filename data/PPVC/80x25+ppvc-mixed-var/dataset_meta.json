@@ -1,0 +1,9 @@
+{
+ "seed0": 150000,
+ "n_instances": 50,
+ "n_modules": 80,
+ "ppvc_mix": "mixed",
+ "ppvc_factory": "default",
+ "route_variant": "variable",
+ "purpose": "variable-route test set at production-batch size (modules of 18-22 operations)"
+}

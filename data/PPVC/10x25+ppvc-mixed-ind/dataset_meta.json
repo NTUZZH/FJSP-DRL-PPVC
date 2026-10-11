@@ -1,0 +1,8 @@
+{
+ "seed0": 720000,
+ "n_instances": 100,
+ "n_modules": 10,
+ "ppvc_mix": "mixed",
+ "ppvc_factory": "default",
+ "purpose": "independent confirmation test set (eval-only), seeds disjoint from all other sets"
+}

@@ -1,0 +1,6 @@
+{
+ "name": "NVIDIA RTX PRO 5000 Blackwell",
+ "memory_total_mib": 49140,
+ "source": "nvidia-smi --query-gpu=name,memory.total, read 2026-10-10 on the training machine",
+ "note": "fallback while nvidia-smi is unavailable (driver/library mismatch after a host update, 2026-10-11)"
+}

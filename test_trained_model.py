@@ -29,7 +29,7 @@ def test_greedy_strategy(data_set, model_path, seed):
     test_result_list = []
 
     setup_seed(seed)
-    ppo.policy.load_state_dict(torch.load(model_path, map_location='cuda'))
+    ppo.policy.load_state_dict(torch.load(model_path, map_location=device))
     ppo.policy.eval()
 
     n_j = data_set[0][0].shape[0]
@@ -73,7 +73,7 @@ def test_sampling_strategy(data_set, model_path, sample_times, seed):
     """
     setup_seed(seed)
     test_result_list = []
-    ppo.policy.load_state_dict(torch.load(model_path, map_location='cuda'))
+    ppo.policy.load_state_dict(torch.load(model_path, map_location=device))
     ppo.policy.eval()
 
     n_j = data_set[0][0].shape[0]
@@ -125,15 +125,18 @@ def main(config, flag_sample):
     test_model = []
 
     for model_name in config.test_model:
+        # PLAN model names carry the '+plan' tag, DANIEL names must not
+        check_backbone_tag(model_name, config.framework)
         test_model.append((f'./trained_network/{config.model_source}/{model_name}.pth', model_name))
 
     # collect the test data
     test_data = pack_data_from_config(config.data_source, config.test_data)
 
+    backbone = 'PLAN' if config.framework == 'PLAN' else 'DANIEL'
     if flag_sample:
-        model_prefix = "DANIELS"
+        model_prefix = f"{backbone}S"
     else:
-        model_prefix = "DANIELG"
+        model_prefix = f"{backbone}G"
 
     for data in test_data:
         print("-" * 25 + "Test Learned Model" + "-" * 25)

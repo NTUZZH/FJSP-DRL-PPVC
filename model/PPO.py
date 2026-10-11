@@ -1,4 +1,5 @@
 from model.main_model import *
+from model.plan import PLAN
 from common_utils import eval_actions
 import torch.nn as nn
 import torch
@@ -141,6 +142,18 @@ class Memory:
         return t_advantage_seq.flatten(0, 1), v_target_seq
 
 
+POLICY_CLASSES = {'DANIEL': DANIEL, 'PLAN': PLAN}
+
+
+def build_policy(config):
+    """Build the policy network selected by config.framework (default DANIEL)."""
+    framework = getattr(config, 'framework', 'DANIEL')
+    if framework not in POLICY_CLASSES:
+        raise ValueError(f'unknown framework: {framework} '
+                         f'(choices: {sorted(POLICY_CLASSES)})')
+    return POLICY_CLASSES[framework](config)
+
+
 class PPO:
     def __init__(self, config):
         """
@@ -159,7 +172,7 @@ class PPO:
         self.entloss_coef = config.entloss_coef
         self.minibatch_size = config.minibatch_size
 
-        self.policy = DANIEL(config)
+        self.policy = build_policy(config)
         self.policy_old = deepcopy(self.policy)
 
         self.policy_old.load_state_dict(self.policy.state_dict())

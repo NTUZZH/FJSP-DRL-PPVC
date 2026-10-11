@@ -30,7 +30,7 @@ for k in ('fea_j_input_dim', 'fea_m_input_dim', 'num_heads_OAB', 'num_heads_MAB'
           'layer_fea_output_dim', 'num_mlp_layers_actor', 'hidden_dim_actor',
           'num_mlp_layers_critic', 'hidden_dim_critic', 'dropout_prob',
           'type_emb_dim', 'n_op_types', 'n_mch_types',
-          'use_type_embedding', 'use_lag_features'):
+          'use_type_embedding', 'use_lag_features', 'framework'):
     if k in snap:
         setattr(configs, k, snap[k])
 configs.device = 'cpu'

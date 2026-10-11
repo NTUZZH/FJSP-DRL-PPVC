@@ -21,6 +21,25 @@ Derived components in this repo (adapted from DANIEL):
   - common_utils.py, data_utils.py, params.py, train.py, print_test_result.py,
     test_trained_model.py, test_heuristic.py   (base training/eval scaffolding)
 
+Further ported components
+-------------------------
+  - backbones/hgnn/     HGNN scheduler of W. Song, X. Chen, Q. Li, Z. Cao,
+                        "Flexible Job-Shop Scheduling via Graph Neural Network
+                        and Deep Reinforcement Learning," IEEE Transactions on
+                        Industrial Informatics 19(2):1600-1610, 2023,
+                        DOI 10.1109/TII.2022.3189725.
+                        Repository: https://github.com/songwenas12/fjsp-drl
+                        Apache License 2.0; see backbones/hgnn/LICENSE and
+                        backbones/hgnn/NOTICE for the changed and added files.
+  - model/plan.py       PLAN backbone (class AttL) of the PLAN fork of DANIEL,
+                        "PLAN: Parallel Liquid-Inspired Approximation Network
+                        for Efficient Representation Learning in Flexible Job
+                        Shop Scheduling," arXiv:2608.03041, 2026.
+                        Repository: https://github.com/Dhivya-DD17/PLAN
+                        The repository carries no explicit license; the port is
+                        reproduced on the same terms as the DANIEL-derived code
+                        above.
+
 Further upstreams credited by DANIEL
 ------------------------------------
   - L2D                  https://github.com/zcaicaros/L2D

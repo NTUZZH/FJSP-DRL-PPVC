@@ -59,6 +59,18 @@ OUTPUT
     the other Result_*.npy so analyze_results.py auto-discovers it as method
     "GA<budget>" (e.g. GA60 / GA300) and computes gap + Wilcoxon vs the DRL
     methods.
+  test_results/PPVC/<dataset>/Result_GA{budget}+<dataset>_<dataset>.json
+    (same stem; analyze_results.py reads only the .npy) per-instance
+    makespan, seconds, generations and the contention evidence of the
+    budgeted search (eval_stochastic_lags.solve_timing and
+    contention_fields): solve_wall_s,
+    solve_cpu_s, workers (1, the GA is single-threaded), cpu_share = CPU s /
+    (wall s x workers), status 'budget', time_limit_s, hit_limit, and
+    cpu_share_min, n_timed_solves, n_hit_limit, n_low_share, n_no_evidence,
+    affinity, loadavg_start; key "contention" holds the run-level summary.
+    The GA always runs to its budget, so its result depends on the CPU it
+    received: a run with cpu_share below 0.9 ran on shared cores and is not a
+    valid measurement.
 
 The GA core (encoding, operators, fitness via the decoder, validation) is pure
 numpy. The ONLY place the repo env is touched is initial-population seeding: a
@@ -110,6 +122,9 @@ _ARGS = parse_cli()
 
 from right_shift_repair import right_shift_repair
 from schedule_validator import validate_schedule
+from eval_stochastic_lags import (SolveClock, contention_fields,
+                                  contention_summary, loadavg_now,
+                                  solve_timing, LOW_CPU_SHARE)
 
 
 # --------------------------------------------------------------------------- #
@@ -554,6 +569,9 @@ SEED_RULES = ('SPT', 'MWKR', 'MOR', 'FIFO')
 
 def main():
     args = _ARGS
+    # CPU-only baseline: keep the seeding environment off the GPU unless the
+    # caller chose a device explicitly (torch is first imported below).
+    os.environ.setdefault('CUDA_VISIBLE_DEVICES', '')
 
     stems = list_instances(args.data_path, cap=args.max_instances)
     n = len(stems)
@@ -562,6 +580,7 @@ def main():
 
     results = np.zeros((n, 2))   # [makespan, seconds]
     feas_count = 0
+    records = []
 
     ref, ref_path = load_or_reference(args.data_path)
     bases = [os.path.basename(s) for s in stems]
@@ -578,6 +597,7 @@ def main():
         jl, pt, meta = load_instance(stem)
         time_lag = np.asarray(meta['time_lag'])
         base = os.path.basename(stem)
+        la_start = loadavg_now()
 
         # per-instance derived seed so each instance is independently
         # reproducible yet the whole run is determined by --seed
@@ -590,10 +610,13 @@ def main():
                 jl, pt, time_lag, SEED_RULES, seed=args.seed * 100003 + i)
 
         t1 = time.time()
-        ms, amch, oct_, gen = run_ga(
-            jl, pt, time_lag, rng, args.budget_s, pop_size=args.pop,
-            pdr_seeds=pdr_seeds)
+        with SolveClock() as clk:
+            ms, amch, oct_, gen = run_ga(
+                jl, pt, time_lag, rng, args.budget_s, pop_size=args.pop,
+                pdr_seeds=pdr_seeds)
         sec = time.time() - t1
+        timing = solve_timing(clk.wall_s, clk.cpu_s, 1, args.budget_s,
+                              'budget')
 
         # independent feasibility check against the TRUE lags
         res = validate_schedule(jl, pt, time_lag, amch, oct_)
@@ -606,13 +629,17 @@ def main():
         feas_count += 1
 
         results[i] = [ms, sec]
+        records.append(dict(instance=base, makespan=ms, seconds=sec,
+                            generations=gen, **timing,
+                            **contention_fields([timing], la_start)))
 
         ref_str = ''
         if base in ref and ref[base] > 0:
             gap = 100.0 * (ms - ref[base]) / ref[base]
             ref_str = f'  cp-sat={ref[base]:.0f}h  gap={gap:+.1f}%'
         print(f'  [{i + 1:3d}/{n}] {base}  makespan={ms:7.1f}h  '
-              f'gens={gen:5d}  {sec:5.1f}s{ref_str}')
+              f'gens={gen:5d}  {sec:5.1f}s  '
+              f'cpu_share={timing["cpu_share"]:.2f}{ref_str}')
 
     # save npy (analyze_results discovers method = budget_tag, e.g. GA60)
     save_dir = f'./test_results/PPVC/{dataset}'
@@ -620,6 +647,14 @@ def main():
     out = os.path.join(save_dir,
                        f'Result_{budget_tag}+{dataset}_{dataset}.npy')
     np.save(out, results)
+    contention = contention_summary(records)
+    with open(out[:-len('.npy')] + '.json', 'w') as f:
+        json.dump(dict(method='GA', dataset=dataset, n_instances=n,
+                       budget_s=args.budget_s, pop=args.pop, seed=args.seed,
+                       no_seed_pdr=bool(args.no_seed_pdr),
+                       seed_rules=None if args.no_seed_pdr
+                       else list(SEED_RULES),
+                       instances=records, contention=contention), f, indent=1)
 
     # summary
     mean_ms = results[:, 0].mean()
@@ -639,8 +674,13 @@ def main():
     print(f'  mean time (s)      : {mean_t:.2f}')
     print(f'  feasible           : {feas_count}/{n}')
     print(f'  mean gap% vs CP-SAT: {gap_str}')
+    cs = ('n/a' if contention['cpu_share_min'] is None
+          else f'{contention["cpu_share_min"]:.3f}')
+    print(f'  contention         : min cpu_share {cs}, budget-limited '
+          f'{contention["n_hit_limit"]}/{contention["n_timed_solves"]}, '
+          f'cpu_share < {LOW_CPU_SHARE}: {contention["n_low_share"]}')
     print('=' * 70)
-    print(f'  saved {out}')
+    print(f'  saved {out} and .json')
 
 
 if __name__ == '__main__':

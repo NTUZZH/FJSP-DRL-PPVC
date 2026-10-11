@@ -25,7 +25,8 @@ class EnvState:
     op_type_tensor: torch.Tensor = None
     mch_type_tensor: torch.Tensor = None
 
-    device = torch.device(configs.device)
+    # fall back to the CPU when the process cannot see a GPU (CPU-only campaigns hide it)
+    device = torch.device(configs.device if configs.device == "cpu" or torch.cuda.is_available() else "cpu")
 
     def update(self, fea_j, op_mask, fea_m, mch_mask, dynamic_pair_mask,
                comp_idx, candidate, fea_pairs, op_type=None, mch_type=None):
@@ -103,7 +104,7 @@ class FJSPEnvForSameOpNums:
         fea_pairs: pair features with shape [sz_b, J, M, 8]
     """
 
-    def __init__(self, n_j, n_m, use_lag_features=False):
+    def __init__(self, n_j, n_m, use_lag_features=False, bound_lag_free=False):
         """
         :param n_j: the number of jobs
         :param n_m: the number of machines
@@ -111,12 +112,20 @@ class FJSPEnvForSameOpNums:
                 anticipatory lag channels (static lag, remaining lag) to the
                 operation features (op_fea_dim 10 -> 12). False reproduces
                 the original DANIEL feature set exactly.
+        :param bound_lag_free: (ablation of Adaptation 2a) if True, the
+                completion-time lower bound op_ct_lb omits the predecessor
+                time-lag term (the original DANIEL per-job cumsum of min
+                processing times), while the dynamics keep the lags. The
+                bound then under-estimates lagged completion times; it is
+                corrected only as operations are scheduled. False (default)
+                keeps the lag-augmented bound.
         """
         self.number_of_jobs = n_j
         self.number_of_machines = n_m
         self.old_state = EnvState()
 
         self.use_lag_features = use_lag_features
+        self.bound_lag_free = bound_lag_free
         # the dimension of operation raw features
         self.op_fea_dim = 12 if use_lag_features else 10
         # the dimension of machine raw features
@@ -235,7 +244,8 @@ class FJSPEnvForSameOpNums:
                 first = self.job_first_op_id[k][i]
                 last = self.job_last_op_id[k][i]
                 seg = self.op_ct_lb[k][first:last + 1]
-                seg[1:] += self.op_lag[k][first:last]
+                if not self.bound_lag_free:
+                    seg[1:] += self.op_lag[k][first:last]
                 self.op_ct_lb[k][first:last + 1] = np.cumsum(seg)
 
         # job remaining number of operations

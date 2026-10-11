@@ -1,0 +1,14 @@
+# PPVC evaluation summary — 10x25+ppvc-mixed+full
+
+- dataset: `10x25+ppvc-mixed`  (100 instances)
+- checkpoint: `./trained_network/PPVC/10x25+ppvc-mixed+full.pth`
+- seed_test: 50  
+- architecture (from snapshot): framework=DANIEL, use_lag_features=True, use_type_embedding=True, fea_j_input_dim=12, n_op_types=5, n_mch_types=9
+- CP-SAT reference: `./or_solution/PPVC/10x25+ppvc-mixed.jsonl` (coverage 100/100 instances)
+
+| method | mean makespan | std | mean time (s) | feasible | mean gap% vs CP-SAT (cov) |
+|---|---|---|---|---|---|
+| SPTL | 216.5 | 9.5 | 0.2665 | 100/100 | 6.61% (100) |
+| LLF | 215.7 | 8.5 | 0.2699 | 100/100 | 6.24% (100) |
+| MWKRL | 219.6 | 10.5 | 0.2659 | 100/100 | 8.09% (100) |
+| LRPTL | 219.7 | 11.0 | 0.2692 | 100/100 | 8.14% (100) |

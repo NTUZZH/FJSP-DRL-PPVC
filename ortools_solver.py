@@ -8,7 +8,7 @@ from params import configs
 from data_utils import pack_data_from_config
 import collections
 
-os.environ["CUDA_VISIBLE_DEVICES"] = configs.device_id
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", configs.device_id)  # respect an explicit CPU-only setting
 
 
 def solve_instances(config):

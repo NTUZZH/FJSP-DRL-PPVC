@@ -1,0 +1,9 @@
+{
+ "seed0": 130000,
+ "n_instances": 50,
+ "n_modules": 20,
+ "ppvc_mix": "mixed",
+ "ppvc_factory": "default",
+ "route_variant": "variable",
+ "purpose": "variable-route L test set (modules of 18-22 operations)"
+}

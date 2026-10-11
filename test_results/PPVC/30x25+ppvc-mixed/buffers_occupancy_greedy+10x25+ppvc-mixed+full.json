@@ -1,0 +1,331 @@
+{
+ "dataset": "30x25+ppvc-mixed",
+ "method": "greedy",
+ "label": "greedy+10x25+ppvc-mixed+full",
+ "model_name": "10x25+ppvc-mixed+full",
+ "seed_test": 50,
+ "window": "[c_i, c_i + lag_i) for non-terminal ops with lag>0",
+ "n_instances": 20,
+ "pooled": {
+  "peak": {
+   "mean": 17.7,
+   "median": 18.5,
+   "max": 21.0,
+   "min": 14.0,
+   "n": 20
+  },
+  "peak_by_type": {
+   "curing": {
+    "mean": 9.35,
+    "median": 10.0,
+    "max": 11.0,
+    "min": 8.0,
+    "n": 20
+   },
+   "ponding": {
+    "mean": 10.05,
+    "median": 10.0,
+    "max": 12.0,
+    "min": 8.0,
+    "n": 20
+   },
+   "drying": {
+    "mean": 17.5,
+    "median": 18.5,
+    "max": 21.0,
+    "min": 11.0,
+    "n": 20
+   }
+  },
+  "makespan": {
+   "mean": 342.55,
+   "median": 350.5,
+   "max": 369.0,
+   "min": 302.0,
+   "n": 20
+  }
+ },
+ "per_instance": [
+  {
+   "instance": "instance_000",
+   "instance_id": 0,
+   "makespan": 346.0,
+   "rollout_s": 3.368746280670166,
+   "feasible": true,
+   "peak": 20,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 9,
+    "drying": 20
+   },
+   "n_windows": 97
+  },
+  {
+   "instance": "instance_001",
+   "instance_id": 1,
+   "makespan": 354.0,
+   "rollout_s": 3.3789894580841064,
+   "feasible": true,
+   "peak": 19,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 10,
+    "drying": 19
+   },
+   "n_windows": 97
+  },
+  {
+   "instance": "instance_002",
+   "instance_id": 2,
+   "makespan": 327.0,
+   "rollout_s": 3.4601380825042725,
+   "feasible": true,
+   "peak": 16,
+   "peak_by_type": {
+    "curing": 9,
+    "ponding": 12,
+    "drying": 16
+   },
+   "n_windows": 96
+  },
+  {
+   "instance": "instance_003",
+   "instance_id": 3,
+   "makespan": 360.0,
+   "rollout_s": 3.457669973373413,
+   "feasible": true,
+   "peak": 19,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 12,
+    "drying": 19
+   },
+   "n_windows": 102
+  },
+  {
+   "instance": "instance_004",
+   "instance_id": 4,
+   "makespan": 332.0,
+   "rollout_s": 3.3573737144470215,
+   "feasible": true,
+   "peak": 18,
+   "peak_by_type": {
+    "curing": 8,
+    "ponding": 9,
+    "drying": 18
+   },
+   "n_windows": 93
+  },
+  {
+   "instance": "instance_005",
+   "instance_id": 5,
+   "makespan": 369.0,
+   "rollout_s": 3.3988261222839355,
+   "feasible": true,
+   "peak": 19,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 10,
+    "drying": 19
+   },
+   "n_windows": 98
+  },
+  {
+   "instance": "instance_006",
+   "instance_id": 6,
+   "makespan": 354.0,
+   "rollout_s": 3.3605523109436035,
+   "feasible": true,
+   "peak": 19,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 11,
+    "drying": 19
+   },
+   "n_windows": 97
+  },
+  {
+   "instance": "instance_007",
+   "instance_id": 7,
+   "makespan": 355.0,
+   "rollout_s": 3.275021553039551,
+   "feasible": true,
+   "peak": 19,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 9,
+    "drying": 19
+   },
+   "n_windows": 96
+  },
+  {
+   "instance": "instance_008",
+   "instance_id": 8,
+   "makespan": 357.0,
+   "rollout_s": 3.2075979709625244,
+   "feasible": true,
+   "peak": 20,
+   "peak_by_type": {
+    "curing": 9,
+    "ponding": 10,
+    "drying": 20
+   },
+   "n_windows": 101
+  },
+  {
+   "instance": "instance_009",
+   "instance_id": 9,
+   "makespan": 354.0,
+   "rollout_s": 3.2566754817962646,
+   "feasible": true,
+   "peak": 19,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 10,
+    "drying": 19
+   },
+   "n_windows": 95
+  },
+  {
+   "instance": "instance_010",
+   "instance_id": 10,
+   "makespan": 328.0,
+   "rollout_s": 3.4117259979248047,
+   "feasible": true,
+   "peak": 15,
+   "peak_by_type": {
+    "curing": 8,
+    "ponding": 11,
+    "drying": 11
+   },
+   "n_windows": 95
+  },
+  {
+   "instance": "instance_011",
+   "instance_id": 11,
+   "makespan": 302.0,
+   "rollout_s": 3.408059597015381,
+   "feasible": true,
+   "peak": 14,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 10,
+    "drying": 14
+   },
+   "n_windows": 92
+  },
+  {
+   "instance": "instance_012",
+   "instance_id": 12,
+   "makespan": 304.0,
+   "rollout_s": 3.415496826171875,
+   "feasible": true,
+   "peak": 14,
+   "peak_by_type": {
+    "curing": 8,
+    "ponding": 8,
+    "drying": 14
+   },
+   "n_windows": 89
+  },
+  {
+   "instance": "instance_013",
+   "instance_id": 13,
+   "makespan": 323.0,
+   "rollout_s": 3.3078925609588623,
+   "feasible": true,
+   "peak": 16,
+   "peak_by_type": {
+    "curing": 8,
+    "ponding": 11,
+    "drying": 16
+   },
+   "n_windows": 94
+  },
+  {
+   "instance": "instance_014",
+   "instance_id": 14,
+   "makespan": 347.0,
+   "rollout_s": 3.27154278755188,
+   "feasible": true,
+   "peak": 17,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 9,
+    "drying": 17
+   },
+   "n_windows": 97
+  },
+  {
+   "instance": "instance_015",
+   "instance_id": 15,
+   "makespan": 316.0,
+   "rollout_s": 3.26975679397583,
+   "feasible": true,
+   "peak": 15,
+   "peak_by_type": {
+    "curing": 9,
+    "ponding": 10,
+    "drying": 15
+   },
+   "n_windows": 93
+  },
+  {
+   "instance": "instance_016",
+   "instance_id": 16,
+   "makespan": 368.0,
+   "rollout_s": 3.3124382495880127,
+   "feasible": true,
+   "peak": 21,
+   "peak_by_type": {
+    "curing": 11,
+    "ponding": 11,
+    "drying": 21
+   },
+   "n_windows": 98
+  },
+  {
+   "instance": "instance_017",
+   "instance_id": 17,
+   "makespan": 344.0,
+   "rollout_s": 3.279817819595337,
+   "feasible": true,
+   "peak": 17,
+   "peak_by_type": {
+    "curing": 8,
+    "ponding": 9,
+    "drying": 17
+   },
+   "n_windows": 98
+  },
+  {
+   "instance": "instance_018",
+   "instance_id": 18,
+   "makespan": 357.0,
+   "rollout_s": 3.3045873641967773,
+   "feasible": true,
+   "peak": 19,
+   "peak_by_type": {
+    "curing": 9,
+    "ponding": 10,
+    "drying": 19
+   },
+   "n_windows": 103
+  },
+  {
+   "instance": "instance_019",
+   "instance_id": 19,
+   "makespan": 354.0,
+   "rollout_s": 3.2807915210723877,
+   "feasible": true,
+   "peak": 18,
+   "peak_by_type": {
+    "curing": 10,
+    "ponding": 10,
+    "drying": 18
+   },
+   "n_windows": 101
+  }
+ ],
+ "seconds": 66.93052911758423
+}

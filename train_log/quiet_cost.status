@@ -1,0 +1,5 @@
+[2026-10-10 15:59:01] START quiet window; load 0.90 0.77 1.29; gpu 0 procs
+[2026-10-10 16:11:17] latency exit 0
+[2026-10-10 16:28:13] train 200 updates exit 0 wall_s 1016.019389117
+[2026-10-10 16:28:13] gpu memory peak MiB 4008 (whole card; baseline before training recorded at START)
+[2026-10-10 16:28:13] done; load 1.05 1.27 1.26

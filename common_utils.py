@@ -84,6 +84,43 @@ def available_mch_list_for_job(chosen_job, env):
     return chosen_mch_list
 
 
+def _lag_rule_route_suffixes(env, pt_stat):
+    """
+        per-operation remaining-route sums for the lag-aware job rules
+        (environment 0, true hours), cached on the env per instance
+    :param env: the production environment (after set_initial_data)
+    :param pt_stat: 'mean' or 'min' processing time over compatible machines
+    :return: (work_suffix [N], lag_suffix [N]) where, for an operation o of a
+        job whose last operation is l, work_suffix[o] = sum of pt_stat over
+        o..l and lag_suffix[o] = sum of post-op lags over o..l-1 (the lag of
+        the last operation delays no successor)
+    """
+    cache = getattr(env, '_lag_rule_cache', None)
+    if cache is None or cache[0] is not env.true_op_pt:
+        cache = (env.true_op_pt, {})
+        env._lag_rule_cache = cache
+    if pt_stat in cache[1]:
+        return cache[1][pt_stat]
+
+    pt = env.true_op_pt[0].astype(float)          # [N, M], 0 = incompatible
+    compatible = pt > 0
+    if pt_stat == 'mean':
+        op_pt = pt.sum(axis=1) / compatible.sum(axis=1)
+    else:
+        op_pt = np.where(compatible, pt, np.inf).min(axis=1)
+    lag = env.true_op_lag[0].astype(float)
+    work_suffix = np.zeros_like(op_pt)
+    lag_suffix = np.zeros_like(op_pt)
+    for first, last in zip(env.job_first_op_id[0], env.job_last_op_id[0]):
+        seg = slice(first, last + 1)
+        work_suffix[seg] = np.cumsum(op_pt[seg][::-1])[::-1]
+        route_lag = lag[seg].copy()
+        route_lag[-1] = 0.0
+        lag_suffix[seg] = np.cumsum(route_lag[::-1])[::-1]
+    cache[1][pt_stat] = (work_suffix, lag_suffix)
+    return cache[1][pt_stat]
+
+
 def heuristic_select_action(method, env):
     """
     :param method: the name of heuristic method
@@ -96,6 +133,22 @@ def heuristic_select_action(method, env):
     MOR(or MOPNR): Most operations remaining
     SPT: Shortest processing time
     MWKR: Most work remaining
+
+    lag-aware rules (true, unnormalized hours from env.true_op_pt and
+    env.true_op_lag; the post-operation lag delays only the job):
+    SPTL: shortest processing time plus the operation's post-op lag
+          (pair-level, like SPT)
+    LLF: longest post-op lag first, ties by shortest processing time
+          (pair-level, like SPT)
+    MWKRL: most work remaining, where work = mean processing time of every
+          unscheduled operation of the job plus the lags between them
+          (job-level with MWKR's machine choice)
+    LRPTL: longest remaining route, where route = min processing time of
+          every unscheduled operation plus the lags between them
+          (job-level with MWKR's machine choice). Each job is a chain, so
+          its remaining critical path IS its remaining work; LRPTL differs
+          from MWKRL only by using the min instead of the mean processing
+          time along the route
     """
     chosen_job = -1
     chosen_mch = -1
@@ -150,6 +203,35 @@ def heuristic_select_action(method, env):
         chosen_mch_list = available_mch_list_for_job(chosen_job, env)
         chosen_mch = np.random.choice(chosen_mch_list)
 
+    elif method in ('SPTL', 'LLF'):
+        # pair-level, same eligible set and tie-break as SPT
+        true_cand_pt = env.true_op_pt[0][env.candidate[0]].astype(float)   # [J, M]
+        cand_lag = env.true_op_lag[0][env.candidate[0]]                    # [J]
+        eligible = ~env.dynamic_pair_mask[0]
+        if method == 'SPTL':
+            score = true_cand_pt + cand_lag[:, np.newaxis]
+            score[~eligible] = float("inf")
+            action_list = np.where(score.reshape(-1) == np.min(score))[0]
+        else:
+            lag_pair = np.broadcast_to(cand_lag[:, np.newaxis], eligible.shape).copy()
+            lag_pair[~eligible] = float("-inf")
+            longest = eligible & (lag_pair == np.max(lag_pair))
+            pt_pair = np.where(longest, true_cand_pt, float("inf"))
+            action_list = np.where(pt_pair.reshape(-1) == np.min(pt_pair))[0]
+        action = np.random.choice(action_list)
+        return action
+
+    elif method in ('MWKRL', 'LRPTL'):
+        # job-level, same eligible jobs, tie-break and machine choice as MWKR
+        work_suffix, lag_suffix = _lag_rule_route_suffixes(
+            env, 'mean' if method == 'MWKRL' else 'min')
+        route_list = work_suffix[available_ops] + lag_suffix[available_ops]
+
+        chosen_job = available_jobs[np.random.choice(max_element_index(route_list)[0])]
+
+        chosen_mch_list = available_mch_list_for_job(chosen_job, env)
+        chosen_mch = np.random.choice(chosen_mch_list)
+
     else:
         print(f'Error From rule select: undefined method {method}')
         sys.exit()
@@ -198,6 +280,45 @@ def strToSuffix(str):
         return str
     else:
         return '+' + str
+
+
+def backbone_model_suffix(model_suffix, framework='DANIEL'):
+    """
+        model-name suffix for a given backbone. DANIEL names are unchanged
+        ('+<suffix>'); PLAN names carry the 'plan' tag ('+plan-<suffix>', or
+        '+plan' for an empty suffix) so the checkpoints and result files of the
+        two backbones never collide.
+    """
+    if framework == 'PLAN':
+        return '+plan' if model_suffix == '' else '+plan-' + model_suffix
+    return strToSuffix(model_suffix)
+
+
+def has_plan_tag(model_name):
+    """True when the last '+'-component of a model name is 'plan' or 'plan-...'."""
+    last = model_name.split('+')[-1]
+    return last == 'plan' or last.startswith('plan-')
+
+
+def check_backbone_tag(model_name, framework='DANIEL'):
+    """
+        guard against loading a checkpoint into the wrong backbone: PLAN model
+        names must carry the 'plan' tag and DANIEL names must not
+    """
+    if framework == 'PLAN' and not has_plan_tag(model_name):
+        raise ValueError(f"framework=PLAN but model name '{model_name}' lacks the "
+                         f"'+plan' / '+plan-<suffix>' tag")
+    if framework != 'PLAN' and has_plan_tag(model_name):
+        raise ValueError(f"model name '{model_name}' carries the PLAN tag but "
+                         f"framework={framework}")
+
+
+def backbone_file_tag(model_name, framework='DANIEL'):
+    """
+        tag for result files whose names do not already contain the model name:
+        '' for DANIEL (names unchanged), '+<model_name>' for PLAN
+    """
+    return f'+{model_name}' if framework == 'PLAN' else ''
 
 
 def setup_seed(seed):

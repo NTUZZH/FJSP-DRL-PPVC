@@ -1,0 +1,1979 @@
+{
+ "dataset": "50x25+ppvc-mixed",
+ "n_instances": 50,
+ "rule": "module j uses station S_t[j mod n_t] of each type t",
+ "cpsat_time_limit_s": 300.0,
+ "cpsat_workers": 2,
+ "cpsat_start": "cold",
+ "flexible_reference": null,
+ "flexible_reference_time_limit_s": null,
+ "model": "10x25+ppvc-mixed+full",
+ "checkpoint": "./trained_network/PPVC/10x25+ppvc-mixed+full.pth",
+ "seed_test": 50,
+ "cross_checks": [
+  "SPT: 50/50 instances equal to `test_results/PPVC/50x25+ppvc-mixed/Result_SPT+pdr_50x25+ppvc-mixed.npy`",
+  "greedy: no existing result file to compare"
+ ],
+ "wall_s": 15462.680566549301,
+ "per_instance": [
+  {
+   "instance": "instance_000",
+   "compat_flexible": 3.119090909090909,
+   "compat_flowline": 1.0,
+   "spt_flowline": 505.0,
+   "cpsat_flowline": 437.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 407.0,
+   "cpsat_flowline_s": 300.0382945728488,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0383,
+    "solve_cpu_s": 599.8427,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 438.0,
+   "greedy_flexible": 442.0,
+   "greedy_flexible_s": 7.218228816986084,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 437.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    12.24,
+    12.35,
+    12.5
+   ]
+  },
+  {
+   "instance": "instance_001",
+   "compat_flexible": 3.1245454545454545,
+   "compat_flowline": 1.0,
+   "spt_flowline": 468.0,
+   "cpsat_flowline": 422.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 386.0,
+   "cpsat_flowline_s": 300.0355680799112,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0356,
+    "solve_cpu_s": 599.951,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 436.0,
+   "greedy_flexible": 434.0,
+   "greedy_flexible_s": 7.177163124084473,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 422.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    12.71,
+    12.6,
+    12.56
+   ]
+  },
+  {
+   "instance": "instance_002",
+   "compat_flexible": 3.1163636363636362,
+   "compat_flowline": 1.0,
+   "spt_flowline": 504.0,
+   "cpsat_flowline": 437.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 393.0,
+   "cpsat_flowline_s": 300.0155921028927,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0156,
+    "solve_cpu_s": 599.838,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 456.0,
+   "greedy_flexible": 437.0,
+   "greedy_flexible_s": 7.174999475479126,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 437.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    12.26,
+    12.33,
+    12.44
+   ]
+  },
+  {
+   "instance": "instance_003",
+   "compat_flexible": 3.1054545454545455,
+   "compat_flowline": 1.0,
+   "spt_flowline": 513.0,
+   "cpsat_flowline": 438.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 402.0,
+   "cpsat_flowline_s": 300.0212504090741,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0212,
+    "solve_cpu_s": 599.9019,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 467.0,
+   "greedy_flexible": 441.0,
+   "greedy_flexible_s": 7.147973537445068,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 438.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    12.48,
+    12.42,
+    12.43
+   ]
+  },
+  {
+   "instance": "instance_004",
+   "compat_flexible": 3.119090909090909,
+   "compat_flowline": 1.0,
+   "spt_flowline": 500.0,
+   "cpsat_flowline": 435.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 382.0,
+   "cpsat_flowline_s": 300.0154433911666,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0154,
+    "solve_cpu_s": 599.9204,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 444.0,
+   "greedy_flexible": 443.0,
+   "greedy_flexible_s": 7.062570333480835,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 435.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    12.41,
+    12.28,
+    12.36
+   ]
+  },
+  {
+   "instance": "instance_005",
+   "compat_flexible": 3.1054545454545455,
+   "compat_flowline": 1.0,
+   "spt_flowline": 506.0,
+   "cpsat_flowline": 444.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 400.0,
+   "cpsat_flowline_s": 300.01575887203217,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0157,
+    "solve_cpu_s": 599.8841,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 457.0,
+   "greedy_flexible": 435.0,
+   "greedy_flexible_s": 7.08815598487854,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 444.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    11.08,
+    11.77,
+    12.14
+   ]
+  },
+  {
+   "instance": "instance_006",
+   "compat_flexible": 3.1163636363636362,
+   "compat_flowline": 1.0,
+   "spt_flowline": 501.0,
+   "cpsat_flowline": 438.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 397.0,
+   "cpsat_flowline_s": 300.0138546372764,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0138,
+    "solve_cpu_s": 599.9153,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 449.0,
+   "greedy_flexible": 459.0,
+   "greedy_flexible_s": 6.992197036743164,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 438.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    11.08,
+    11.31,
+    11.83
+   ]
+  },
+  {
+   "instance": "instance_007",
+   "compat_flexible": 3.1081818181818184,
+   "compat_flowline": 1.0,
+   "spt_flowline": 476.0,
+   "cpsat_flowline": 418.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 373.0,
+   "cpsat_flowline_s": 300.0148399346508,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0148,
+    "solve_cpu_s": 599.8793,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 436.0,
+   "greedy_flexible": 433.0,
+   "greedy_flexible_s": 7.05776572227478,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 418.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.98,
+    11.06,
+    11.57
+   ]
+  },
+  {
+   "instance": "instance_008",
+   "compat_flexible": 3.119090909090909,
+   "compat_flowline": 1.0,
+   "spt_flowline": 501.0,
+   "cpsat_flowline": 439.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 388.0,
+   "cpsat_flowline_s": 300.01487368391827,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0149,
+    "solve_cpu_s": 599.8762,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 451.0,
+   "greedy_flexible": 462.0,
+   "greedy_flexible_s": 6.958831787109375,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 439.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.94,
+    10.99,
+    11.38
+   ]
+  },
+  {
+   "instance": "instance_009",
+   "compat_flexible": 3.1163636363636362,
+   "compat_flowline": 1.0,
+   "spt_flowline": 493.0,
+   "cpsat_flowline": 445.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 407.0,
+   "cpsat_flowline_s": 300.0212752907537,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0213,
+    "solve_cpu_s": 599.8611,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 455.0,
+   "greedy_flexible": 442.0,
+   "greedy_flexible_s": 7.0042243003845215,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 445.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.86,
+    10.96,
+    11.25
+   ]
+  },
+  {
+   "instance": "instance_010",
+   "compat_flexible": 3.110909090909091,
+   "compat_flowline": 1.0,
+   "spt_flowline": 527.0,
+   "cpsat_flowline": 444.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 391.0,
+   "cpsat_flowline_s": 300.01883914414793,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0188,
+    "solve_cpu_s": 599.8272,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 461.0,
+   "greedy_flexible": 456.0,
+   "greedy_flexible_s": 6.978410720825195,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 444.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.79,
+    10.93,
+    11.16
+   ]
+  },
+  {
+   "instance": "instance_011",
+   "compat_flexible": 3.110909090909091,
+   "compat_flowline": 1.0,
+   "spt_flowline": 502.0,
+   "cpsat_flowline": 441.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 395.0,
+   "cpsat_flowline_s": 300.016005106736,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.016,
+    "solve_cpu_s": 599.9102,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 442.0,
+   "greedy_flexible": 438.0,
+   "greedy_flexible_s": 7.02151894569397,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 441.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.85,
+    10.98,
+    11.11
+   ]
+  },
+  {
+   "instance": "instance_012",
+   "compat_flexible": 3.1245454545454545,
+   "compat_flowline": 1.0,
+   "spt_flowline": 482.0,
+   "cpsat_flowline": 438.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 382.0,
+   "cpsat_flowline_s": 300.2160275587812,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.216,
+    "solve_cpu_s": 600.0809,
+    "workers": 2,
+    "cpu_share": 0.999,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 443.0,
+   "greedy_flexible": 440.0,
+   "greedy_flexible_s": 7.003589153289795,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 438.0,
+   "cpu_share_min": 0.999,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.85,
+    10.98,
+    11.06
+   ]
+  },
+  {
+   "instance": "instance_013",
+   "compat_flexible": 3.132727272727273,
+   "compat_flowline": 1.0,
+   "spt_flowline": 487.0,
+   "cpsat_flowline": 432.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 401.0,
+   "cpsat_flowline_s": 300.014210680034,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0142,
+    "solve_cpu_s": 599.8173,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 450.0,
+   "greedy_flexible": 460.0,
+   "greedy_flexible_s": 7.012790203094482,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 432.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.85,
+    10.95,
+    11.02
+   ]
+  },
+  {
+   "instance": "instance_014",
+   "compat_flexible": 3.1272727272727274,
+   "compat_flowline": 1.0,
+   "spt_flowline": 487.0,
+   "cpsat_flowline": 438.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 386.0,
+   "cpsat_flowline_s": 300.0143394349143,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0143,
+    "solve_cpu_s": 599.8192,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 448.0,
+   "greedy_flexible": 458.0,
+   "greedy_flexible_s": 6.998916864395142,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 438.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.75,
+    10.98,
+    11.01
+   ]
+  },
+  {
+   "instance": "instance_015",
+   "compat_flexible": 3.1218181818181816,
+   "compat_flowline": 1.0,
+   "spt_flowline": 484.0,
+   "cpsat_flowline": 436.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 415.0,
+   "cpsat_flowline_s": 300.0173303280026,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0173,
+    "solve_cpu_s": 599.9357,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 448.0,
+   "greedy_flexible": 456.0,
+   "greedy_flexible_s": 6.576638221740723,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 436.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    10.76,
+    10.95,
+    10.98
+   ]
+  },
+  {
+   "instance": "instance_016",
+   "compat_flexible": 3.1136363636363638,
+   "compat_flowline": 1.0,
+   "spt_flowline": 519.0,
+   "cpsat_flowline": 426.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 380.0,
+   "cpsat_flowline_s": 300.0127315609716,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0127,
+    "solve_cpu_s": 599.8258,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 441.0,
+   "greedy_flexible": 438.0,
+   "greedy_flexible_s": 6.558963060379028,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 426.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    9.37,
+    10.54,
+    10.84
+   ]
+  },
+  {
+   "instance": "instance_017",
+   "compat_flexible": 3.1081818181818184,
+   "compat_flowline": 1.0,
+   "spt_flowline": 502.0,
+   "cpsat_flowline": 432.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 390.0,
+   "cpsat_flowline_s": 300.0604249625467,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0604,
+    "solve_cpu_s": 599.7861,
+    "workers": 2,
+    "cpu_share": 0.999,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 445.0,
+   "greedy_flexible": 441.0,
+   "greedy_flexible_s": 6.463282108306885,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 432.0,
+   "cpu_share_min": 0.999,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    8.84,
+    9.55,
+    10.32
+   ]
+  },
+  {
+   "instance": "instance_018",
+   "compat_flexible": 3.1163636363636362,
+   "compat_flowline": 1.0,
+   "spt_flowline": 502.0,
+   "cpsat_flowline": 431.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 397.0,
+   "cpsat_flowline_s": 300.0142534370534,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0142,
+    "solve_cpu_s": 599.7732,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 456.0,
+   "greedy_flexible": 450.0,
+   "greedy_flexible_s": 6.433438777923584,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 431.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    8.71,
+    9.14,
+    9.92
+   ]
+  },
+  {
+   "instance": "instance_019",
+   "compat_flexible": 3.1272727272727274,
+   "compat_flowline": 1.0,
+   "spt_flowline": 507.0,
+   "cpsat_flowline": 430.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 384.0,
+   "cpsat_flowline_s": 300.04797385213897,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.048,
+    "solve_cpu_s": 599.9824,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 449.0,
+   "greedy_flexible": 457.0,
+   "greedy_flexible_s": 6.468709468841553,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 430.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    8.89,
+    9.08,
+    9.67
+   ]
+  },
+  {
+   "instance": "instance_020",
+   "compat_flexible": 3.119090909090909,
+   "compat_flowline": 1.0,
+   "spt_flowline": 520.0,
+   "cpsat_flowline": 437.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 399.0,
+   "cpsat_flowline_s": 300.01647804584354,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0165,
+    "solve_cpu_s": 599.905,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 459.0,
+   "greedy_flexible": 457.0,
+   "greedy_flexible_s": 6.4397196769714355,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 437.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    9.37,
+    9.26,
+    9.57
+   ]
+  },
+  {
+   "instance": "instance_021",
+   "compat_flexible": 3.1081818181818184,
+   "compat_flowline": 1.0,
+   "spt_flowline": 505.0,
+   "cpsat_flowline": 429.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 384.0,
+   "cpsat_flowline_s": 300.016517508775,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0165,
+    "solve_cpu_s": 599.9267,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 440.0,
+   "greedy_flexible": 438.0,
+   "greedy_flexible_s": 6.435508728027344,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 429.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    8.35,
+    8.93,
+    9.35
+   ]
+  },
+  {
+   "instance": "instance_022",
+   "compat_flexible": 3.1054545454545455,
+   "compat_flowline": 1.0,
+   "spt_flowline": 511.0,
+   "cpsat_flowline": 437.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 405.0,
+   "cpsat_flowline_s": 300.01480987109244,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0148,
+    "solve_cpu_s": 599.9336,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 441.0,
+   "greedy_flexible": 423.0,
+   "greedy_flexible_s": 6.43707537651062,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 437.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    8.36,
+    8.55,
+    9.06
+   ]
+  },
+  {
+   "instance": "instance_023",
+   "compat_flexible": 3.1245454545454545,
+   "compat_flowline": 1.0,
+   "spt_flowline": 508.0,
+   "cpsat_flowline": 442.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 418.0,
+   "cpsat_flowline_s": 300.0097128748894,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0097,
+    "solve_cpu_s": 599.8505,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 456.0,
+   "greedy_flexible": 455.0,
+   "greedy_flexible_s": 6.424702405929565,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 442.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    8.32,
+    8.47,
+    8.88
+   ]
+  },
+  {
+   "instance": "instance_024",
+   "compat_flexible": 3.110909090909091,
+   "compat_flowline": 1.0,
+   "spt_flowline": 489.0,
+   "cpsat_flowline": 443.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 383.0,
+   "cpsat_flowline_s": 300.017779158894,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0178,
+    "solve_cpu_s": 599.948,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 447.0,
+   "greedy_flexible": 448.0,
+   "greedy_flexible_s": 6.425535678863525,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 443.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    7.07,
+    7.67,
+    8.41
+   ]
+  },
+  {
+   "instance": "instance_025",
+   "compat_flexible": 3.1163636363636362,
+   "compat_flowline": 1.0,
+   "spt_flowline": 499.0,
+   "cpsat_flowline": 441.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 401.0,
+   "cpsat_flowline_s": 300.01130976108834,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0113,
+    "solve_cpu_s": 599.9,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 459.0,
+   "greedy_flexible": 453.0,
+   "greedy_flexible_s": 6.448346853256226,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 441.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    6.94,
+    7.27,
+    8.02
+   ]
+  },
+  {
+   "instance": "instance_026",
+   "compat_flexible": 3.119090909090909,
+   "compat_flowline": 1.0,
+   "spt_flowline": 509.0,
+   "cpsat_flowline": 426.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 393.0,
+   "cpsat_flowline_s": 300.0157625982538,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0158,
+    "solve_cpu_s": 599.8951,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 445.0,
+   "greedy_flexible": 467.0,
+   "greedy_flexible_s": 6.439338684082031,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 426.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    7.33,
+    7.23,
+    7.77
+   ]
+  },
+  {
+   "instance": "instance_027",
+   "compat_flexible": 3.1136363636363638,
+   "compat_flowline": 1.0,
+   "spt_flowline": 517.0,
+   "cpsat_flowline": 441.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 398.0,
+   "cpsat_flowline_s": 300.0183695871383,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0184,
+    "solve_cpu_s": 599.9256,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 457.0,
+   "greedy_flexible": 467.0,
+   "greedy_flexible_s": 6.484821796417236,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 441.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    6.28,
+    6.83,
+    7.46
+   ]
+  },
+  {
+   "instance": "instance_028",
+   "compat_flexible": 3.1218181818181816,
+   "compat_flowline": 1.0,
+   "spt_flowline": 477.0,
+   "cpsat_flowline": 431.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 378.0,
+   "cpsat_flowline_s": 300.01527180103585,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0153,
+    "solve_cpu_s": 599.9527,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 442.0,
+   "greedy_flexible": 443.0,
+   "greedy_flexible_s": 6.562346458435059,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 431.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    5.93,
+    6.27,
+    7.02
+   ]
+  },
+  {
+   "instance": "instance_029",
+   "compat_flexible": 3.1136363636363638,
+   "compat_flowline": 1.0,
+   "spt_flowline": 525.0,
+   "cpsat_flowline": 447.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 392.0,
+   "cpsat_flowline_s": 300.01231860369444,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0123,
+    "solve_cpu_s": 600.0055,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 461.0,
+   "greedy_flexible": 455.0,
+   "greedy_flexible_s": 6.430044889450073,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 447.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    5.84,
+    6.04,
+    6.7
+   ]
+  },
+  {
+   "instance": "instance_030",
+   "compat_flexible": 3.1081818181818184,
+   "compat_flowline": 1.0,
+   "spt_flowline": 536.0,
+   "cpsat_flowline": 429.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 401.0,
+   "cpsat_flowline_s": 300.0165881938301,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0166,
+    "solve_cpu_s": 599.9346,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 437.0,
+   "greedy_flexible": 439.0,
+   "greedy_flexible_s": 6.417477130889893,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 429.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    5.85,
+    5.97,
+    6.47
+   ]
+  },
+  {
+   "instance": "instance_031",
+   "compat_flexible": 3.119090909090909,
+   "compat_flowline": 1.0,
+   "spt_flowline": 504.0,
+   "cpsat_flowline": 435.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 400.0,
+   "cpsat_flowline_s": 300.0738341808319,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0738,
+    "solve_cpu_s": 599.8717,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 455.0,
+   "greedy_flexible": 447.0,
+   "greedy_flexible_s": 6.400895833969116,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 435.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.93,
+    5.02,
+    5.95
+   ]
+  },
+  {
+   "instance": "instance_032",
+   "compat_flexible": 3.1163636363636362,
+   "compat_flowline": 1.0,
+   "spt_flowline": 498.0,
+   "cpsat_flowline": 450.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 399.0,
+   "cpsat_flowline_s": 300.01561860879883,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0156,
+    "solve_cpu_s": 599.8969,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 449.0,
+   "greedy_flexible": 449.0,
+   "greedy_flexible_s": 6.408976793289185,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 450.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.92,
+    4.34,
+    5.38
+   ]
+  },
+  {
+   "instance": "instance_033",
+   "compat_flexible": 3.1027272727272726,
+   "compat_flowline": 1.0,
+   "spt_flowline": 512.0,
+   "cpsat_flowline": 432.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 396.0,
+   "cpsat_flowline_s": 300.0100389732979,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.01,
+    "solve_cpu_s": 599.9145,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 445.0,
+   "greedy_flexible": 419.0,
+   "greedy_flexible_s": 6.414182662963867,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 432.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.98,
+    4.12,
+    4.98
+   ]
+  },
+  {
+   "instance": "instance_034",
+   "compat_flexible": 3.1136363636363638,
+   "compat_flowline": 1.0,
+   "spt_flowline": 503.0,
+   "cpsat_flowline": 440.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 395.0,
+   "cpsat_flowline_s": 300.05629535997286,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0563,
+    "solve_cpu_s": 599.9694,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 454.0,
+   "greedy_flexible": 439.0,
+   "greedy_flexible_s": 6.415038108825684,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 440.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.97,
+    4.03,
+    4.69
+   ]
+  },
+  {
+   "instance": "instance_035",
+   "compat_flexible": 3.110909090909091,
+   "compat_flowline": 1.0,
+   "spt_flowline": 504.0,
+   "cpsat_flowline": 421.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 389.0,
+   "cpsat_flowline_s": 300.015242935624,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0152,
+    "solve_cpu_s": 599.9045,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 436.0,
+   "greedy_flexible": 438.0,
+   "greedy_flexible_s": 6.428735971450806,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 421.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.97,
+    4.03,
+    4.5
+   ]
+  },
+  {
+   "instance": "instance_036",
+   "compat_flexible": 3.1218181818181816,
+   "compat_flowline": 1.0,
+   "spt_flowline": 499.0,
+   "cpsat_flowline": 428.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 385.0,
+   "cpsat_flowline_s": 300.0139243383892,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0139,
+    "solve_cpu_s": 599.9186,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 454.0,
+   "greedy_flexible": 447.0,
+   "greedy_flexible_s": 6.40911340713501,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 428.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.86,
+    4.02,
+    4.35
+   ]
+  },
+  {
+   "instance": "instance_037",
+   "compat_flexible": 3.1136363636363638,
+   "compat_flowline": 1.0,
+   "spt_flowline": 494.0,
+   "cpsat_flowline": 431.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 394.0,
+   "cpsat_flowline_s": 300.03337341500446,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0334,
+    "solve_cpu_s": 599.9379,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 444.0,
+   "greedy_flexible": 441.0,
+   "greedy_flexible_s": 6.421660661697388,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 431.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    4.1,
+    4.06,
+    4.27
+   ]
+  },
+  {
+   "instance": "instance_038",
+   "compat_flexible": 3.1,
+   "compat_flowline": 1.0,
+   "spt_flowline": 516.0,
+   "cpsat_flowline": 440.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 395.0,
+   "cpsat_flowline_s": 300.0137825841084,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0138,
+    "solve_cpu_s": 599.8673,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 460.0,
+   "greedy_flexible": 424.0,
+   "greedy_flexible_s": 6.412616491317749,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 440.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.96,
+    4.04,
+    4.2
+   ]
+  },
+  {
+   "instance": "instance_039",
+   "compat_flexible": 3.1136363636363638,
+   "compat_flowline": 1.0,
+   "spt_flowline": 505.0,
+   "cpsat_flowline": 431.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 391.0,
+   "cpsat_flowline_s": 300.0212391107343,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0212,
+    "solve_cpu_s": 599.7587,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 440.0,
+   "greedy_flexible": 428.0,
+   "greedy_flexible_s": 6.397071838378906,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 431.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.97,
+    4.05,
+    4.16
+   ]
+  },
+  {
+   "instance": "instance_040",
+   "compat_flexible": 3.1081818181818184,
+   "compat_flowline": 1.0,
+   "spt_flowline": 527.0,
+   "cpsat_flowline": 450.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 411.0,
+   "cpsat_flowline_s": 300.0146272839047,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0146,
+    "solve_cpu_s": 599.8307,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 451.0,
+   "greedy_flexible": 450.0,
+   "greedy_flexible_s": 6.406039476394653,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 450.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    4.08,
+    4.1,
+    4.15
+   ]
+  },
+  {
+   "instance": "instance_041",
+   "compat_flexible": 3.1136363636363638,
+   "compat_flowline": 1.0,
+   "spt_flowline": 483.0,
+   "cpsat_flowline": 436.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 370.0,
+   "cpsat_flowline_s": 300.0130870840512,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0131,
+    "solve_cpu_s": 599.9045,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 452.0,
+   "greedy_flexible": 434.0,
+   "greedy_flexible_s": 6.419592380523682,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 436.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    4.04,
+    4.07,
+    4.11
+   ]
+  },
+  {
+   "instance": "instance_042",
+   "compat_flexible": 3.1272727272727274,
+   "compat_flowline": 1.0,
+   "spt_flowline": 485.0,
+   "cpsat_flowline": 428.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 383.0,
+   "cpsat_flowline_s": 300.0136185642332,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0136,
+    "solve_cpu_s": 599.9584,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 440.0,
+   "greedy_flexible": 432.0,
+   "greedy_flexible_s": 6.419268608093262,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 428.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.95,
+    4.06,
+    4.08
+   ]
+  },
+  {
+   "instance": "instance_043",
+   "compat_flexible": 3.110909090909091,
+   "compat_flowline": 1.0,
+   "spt_flowline": 497.0,
+   "cpsat_flowline": 440.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 416.0,
+   "cpsat_flowline_s": 300.0179138081148,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0179,
+    "solve_cpu_s": 599.9338,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 446.0,
+   "greedy_flexible": 440.0,
+   "greedy_flexible_s": 6.404371500015259,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 440.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.98,
+    4.02,
+    4.06
+   ]
+  },
+  {
+   "instance": "instance_044",
+   "compat_flexible": 3.1027272727272726,
+   "compat_flowline": 1.0,
+   "spt_flowline": 521.0,
+   "cpsat_flowline": 447.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 401.0,
+   "cpsat_flowline_s": 300.01595636690035,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0159,
+    "solve_cpu_s": 599.9286,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 458.0,
+   "greedy_flexible": 450.0,
+   "greedy_flexible_s": 6.410084009170532,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 447.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.89,
+    3.99,
+    4.03
+   ]
+  },
+  {
+   "instance": "instance_045",
+   "compat_flexible": 3.1081818181818184,
+   "compat_flowline": 1.0,
+   "spt_flowline": 521.0,
+   "cpsat_flowline": 433.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 411.0,
+   "cpsat_flowline_s": 300.02975223306566,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0297,
+    "solve_cpu_s": 599.9168,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 456.0,
+   "greedy_flexible": 442.0,
+   "greedy_flexible_s": 6.406530857086182,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 433.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.89,
+    3.99,
+    4.0
+   ]
+  },
+  {
+   "instance": "instance_046",
+   "compat_flexible": 3.110909090909091,
+   "compat_flowline": 1.0,
+   "spt_flowline": 502.0,
+   "cpsat_flowline": 433.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 404.0,
+   "cpsat_flowline_s": 300.0146354921162,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0146,
+    "solve_cpu_s": 599.8831,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 442.0,
+   "greedy_flexible": 442.0,
+   "greedy_flexible_s": 6.395597696304321,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 433.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.94,
+    4.02,
+    4.0
+   ]
+  },
+  {
+   "instance": "instance_047",
+   "compat_flexible": 3.1272727272727274,
+   "compat_flowline": 1.0,
+   "spt_flowline": 510.0,
+   "cpsat_flowline": 445.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 406.0,
+   "cpsat_flowline_s": 300.0131515781395,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0131,
+    "solve_cpu_s": 599.9052,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 457.0,
+   "greedy_flexible": 483.0,
+   "greedy_flexible_s": 6.403012037277222,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 445.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    4.02,
+    4.07,
+    4.02
+   ]
+  },
+  {
+   "instance": "instance_048",
+   "compat_flexible": 3.1245454545454545,
+   "compat_flowline": 1.0,
+   "spt_flowline": 517.0,
+   "cpsat_flowline": 449.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 416.0,
+   "cpsat_flowline_s": 300.0202139597386,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.0202,
+    "solve_cpu_s": 599.933,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 447.0,
+   "greedy_flexible": 441.0,
+   "greedy_flexible_s": 6.426172971725464,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 449.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.96,
+    4.07,
+    4.02
+   ]
+  },
+  {
+   "instance": "instance_049",
+   "compat_flexible": 3.1081818181818184,
+   "compat_flowline": 1.0,
+   "spt_flowline": 504.0,
+   "cpsat_flowline": 438.0,
+   "cpsat_flowline_status": "FEASIBLE",
+   "cpsat_flowline_bound": 413.0,
+   "cpsat_flowline_s": 300.1005976954475,
+   "cpsat_flowline_timing": {
+    "solve_wall_s": 300.1006,
+    "solve_cpu_s": 599.9458,
+    "workers": 2,
+    "cpu_share": 1.0,
+    "status": "FEASIBLE",
+    "time_limit_s": 300.0,
+    "hit_limit": true
+   },
+   "spt_flexible": 446.0,
+   "greedy_flexible": 459.0,
+   "greedy_flexible_s": 6.4142303466796875,
+   "cpsat_flexible_ref": null,
+   "cpsat_flexible_ref_status": null,
+   "best_flowline": 438.0,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    22,
+    23
+   ],
+   "loadavg_start": [
+    3.93,
+    4.04,
+    4.01
+   ]
+  }
+ ],
+ "contention": {
+  "n_records": 50,
+  "n_records_without_fields": 0,
+  "n_timed_solves": 50,
+  "n_hit_limit": 50,
+  "n_low_share": 0,
+  "n_no_evidence": 0,
+  "cpu_share_min": 0.999
+ }
+}

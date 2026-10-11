@@ -8,16 +8,41 @@ from fjsp_env_same_op_nums import EnvState
 class FJSPEnvForVariousOpNums:
     """
         a batch of fjsp environments that have various number of operations
-        Attributes:
 
+        Instances with fewer operations are padded with dummy operations
+        (all-zero processing-time rows) appended after the last job, up to the
+        largest operation count of the batch (max_number_of_ops).
+
+        PPVC extensions, mirroring FJSPEnvForSameOpNums:
+          - post-operation time-lags (Adaptation 2a): lag dynamics and the
+            lag-augmented completion-time bound op_ct_lb;
+          - anticipatory lag channels (Adaptation 2b, use_lag_features);
+          - op/station type indices carried in the state (Adaptation 1).
+        With all of them off (the defaults) the environment reproduces the
+        original DANIEL behaviour.
     """
 
-    def __init__(self, n_j, n_m):
+    def __init__(self, n_j, n_m, use_lag_features=False, isolate_padding=False):
+        """
+        :param n_j: the number of jobs
+        :param n_m: the number of machines
+        :param use_lag_features: (PPVC, Adaptation 2b) if True, append the
+                static-lag and remaining-lag channels to the operation
+                features (op_fea_dim 10 -> 12)
+        :param isolate_padding: if True, dummy operations are excluded from
+                the feature normalization, their feature rows are exactly
+                zero, and their predecessor/successor edges are masked, so an
+                instance gets the same features in a padded batch as alone.
+                False keeps the original DANIEL normalization, in which the
+                dummy rows enter the per-channel variance as zeros.
+        """
         self.number_of_jobs = n_j
         self.number_of_machines = n_m
         self.old_state = EnvState()
 
-        self.op_fea_dim = 10
+        self.use_lag_features = use_lag_features
+        self.isolate_padding = isolate_padding
+        self.op_fea_dim = 12 if use_lag_features else 10
         self.mch_fea_dim = 8
 
     def set_static_properties(self):
@@ -42,7 +67,24 @@ class FJSPEnvForVariousOpNums:
 
         self.flag_exist_dummy_node = ~(self.env_number_of_ops == self.max_number_of_ops).all()
 
-    def set_initial_data(self, job_length_list, op_pt_list):
+    def set_initial_data(self, job_length_list, op_pt_list, time_lag_list=None,
+                         op_type_list=None, mch_type_list=None):
+        """
+            initialize the data of the instances
+
+        :param job_length_list: the list of 'job_length' (shape [J] each)
+        :param op_pt_list: the list of 'op_pt' (shape [N_k, M] each; N_k may
+                differ across instances)
+        :param time_lag_list: (PPVC, Adaptation 2a) optional list of per-op
+                time-lag vectors (shape [N_k] each): a mandatory wait after an
+                operation completes before its job successor becomes
+                eligible. The machine is free during the lag. None means all
+                lags are zero, which is the original DANIEL behaviour.
+        :param op_type_list: (PPVC, Adaptation 1) optional list of per-op
+                integer type indices (shape [N_k] each)
+        :param mch_type_list: (PPVC, Adaptation 1) optional list of
+                per-machine integer station-type indices (shape [M] each)
+        """
         self.number_of_envs = len(job_length_list)
         self.job_length = np.array(job_length_list)
         self.number_of_machines = op_pt_list[0].shape[1]
@@ -51,6 +93,8 @@ class FJSPEnvForVariousOpNums:
         # 异工序数环境并行化
         self.env_number_of_ops = np.array([op_pt_list[k].shape[0] for k in range(self.number_of_envs)])
         self.max_number_of_ops = np.max(self.env_number_of_ops)
+        # alias used by code written for FJSPEnvForSameOpNums
+        self.number_of_ops = self.max_number_of_ops
 
         self.set_static_properties()
 
@@ -69,6 +113,32 @@ class FJSPEnvForVariousOpNums:
         self.true_op_pt = np.copy(self.op_pt)
 
         self.op_pt = (self.op_pt - self.pt_lower_bound) / (self.pt_upper_bound - self.pt_lower_bound + 1e-8)
+
+        # --- PPVC time-lag (Adaptation 2a) --------------------------------
+        # true_op_lag keeps the raw lag durations ([E, N_max], same unit as
+        # true_op_pt); dummy operations get lag 0. op_lag is scaled by the
+        # same slope as the pt normalization above (no shift, so zero stays
+        # zero) and shares the normalized time axis with op_pt.
+        self.true_op_lag = np.zeros((self.number_of_envs, self.max_number_of_ops))
+        if time_lag_list is not None:
+            for k in range(self.number_of_envs):
+                lag_k = np.asarray(time_lag_list[k], dtype=float)
+                assert lag_k.shape[0] == self.env_number_of_ops[k], \
+                    f'env {k}: {lag_k.shape[0]} lags for {self.env_number_of_ops[k]} ops'
+                self.true_op_lag[k, :self.env_number_of_ops[k]] = lag_k
+        self.op_lag = self.true_op_lag / (self.pt_upper_bound - self.pt_lower_bound + 1e-8)
+
+        # (PPVC, Adaptation 1) static categorical type indices ([E, N_max] /
+        # [E, M]) kept as raw integers; the model embeds them. Dummy
+        # operations get type 0; their feature rows are zero, and the model
+        # zeroes the embedding of zero rows.
+        if op_type_list is None:
+            self.op_type = None
+        else:
+            self.op_type = np.zeros((self.number_of_envs, self.max_number_of_ops), dtype=int)
+            for k in range(self.number_of_envs):
+                self.op_type[k, :self.env_number_of_ops[k]] = np.asarray(op_type_list[k], dtype=int)
+        self.mch_type = None if mch_type_list is None else np.array(mch_type_list).astype(int)
 
         self.process_relation = (self.op_pt != 0)
         self.reverse_process_relation = ~self.process_relation
@@ -93,17 +163,34 @@ class FJSPEnvForVariousOpNums:
 
         self.op_min_pt = np.min(self.op_pt, axis=-1).data
         self.op_max_pt = np.max(self.op_pt, axis=-1).data
+        # A dummy operation has no compatible machine, so the masked min/max
+        # above return the mask fill value (1e20). Set them to 0 so that the
+        # dummy rows cannot dominate max(op_ct_lb), which is the makespan
+        # bound behind the reward. Dummy feature rows are masked before
+        # normalization, so this changes no policy input.
+        self.op_min_pt[self.mask_dummy_node] = 0
+        self.op_max_pt[self.mask_dummy_node] = 0
         self.pt_span = self.op_max_pt - self.op_min_pt
 
         self.mch_min_pt = np.max(self.op_pt, axis=1).data
         self.mch_max_pt = np.max(self.op_pt, axis=1)
 
+        # the estimated lower bound of the completion time of operations
+        # (PPVC, Adaptation 2a) the bound satisfies
+        #   ct_lb[i] >= ct_lb[i-1] + lag[i-1] + min_pt[i]
+        # so each op's predecessor lag is added before the per-job cumsum.
+        # This keeps the bound-based reward admissible under time-lags; with
+        # zero lags the arithmetic equals the original DANIEL bound. The
+        # per-job range stops at the real last op, so dummy ops stay at 0.
         self.op_ct_lb = copy.deepcopy(self.op_min_pt)
 
         for k in range(self.number_of_envs):
             for i in range(self.number_of_jobs):
-                self.op_ct_lb[k][self.job_first_op_id[k][i]:self.job_last_op_id[k][i] + 1] = np.cumsum(
-                    self.op_ct_lb[k][self.job_first_op_id[k][i]:self.job_last_op_id[k][i] + 1])
+                first = self.job_first_op_id[k][i]
+                last = self.job_last_op_id[k][i]
+                seg = self.op_ct_lb[k][first:last + 1]
+                seg[1:] += self.op_lag[k][first:last]
+                self.op_ct_lb[k][first:last + 1] = np.cumsum(seg)
 
         self.op_match_job_left_op_nums = np.array([np.repeat(self.job_length[k],
                                                              repeats=self.virtual_job_length[k])
@@ -143,10 +230,12 @@ class FJSPEnvForVariousOpNums:
 
         self.construct_pair_features()
 
+        # (PPVC, Adaptation 1) type indices travel with the state (None
+        # outside PPVC mode, which leaves the original state unchanged)
         self.old_state.update(self.fea_j, self.op_mask,
                               self.fea_m, self.mch_mask,
                               self.dynamic_pair_mask, self.comp_idx, self.candidate,
-                              self.fea_pairs)
+                              self.fea_pairs, op_type=self.op_type, mch_type=self.mch_type)
 
         # old record
         self.old_op_mask = np.copy(self.op_mask)
@@ -212,6 +301,9 @@ class FJSPEnvForVariousOpNums:
         self.op_scheduled_flag = np.zeros((self.number_of_envs, self.max_number_of_ops))
         self.op_waiting_time = np.zeros((self.number_of_envs, self.max_number_of_ops))
         self.op_remain_work = np.zeros((self.number_of_envs, self.max_number_of_ops))
+        # (PPVC, Adaptation 2b) remaining lag of scheduled ops at the current
+        # decision instant (0 before anything is scheduled)
+        self.op_remain_lag = np.zeros((self.number_of_envs, self.max_number_of_ops))
 
         self.op_available_mch_nums = np.copy(self.compatible_op) / self.number_of_machines
         self.pair_free_time = np.zeros((self.number_of_envs, self.number_of_jobs,
@@ -251,7 +343,12 @@ class FJSPEnvForVariousOpNums:
 
         self.op_ct[self.incomplete_env_idx, chosen_op] = chosen_op_st + self.op_pt[
             self.incomplete_env_idx, chosen_op, chosen_mch]
-        self.candidate_free_time[self.incomplete_env_idx, chosen_job] = self.op_ct[self.incomplete_env_idx, chosen_op]
+        # (PPVC, Adaptation 2a) the job becomes ready only after the post-op
+        # time-lag has elapsed; the machine is free at completion time (the
+        # lag occupies the module, not the station). With zero lags both
+        # lines reduce to the original DANIEL update.
+        self.candidate_free_time[self.incomplete_env_idx, chosen_job] = self.op_ct[self.incomplete_env_idx, chosen_op] \
+            + self.op_lag[self.incomplete_env_idx, chosen_op]
         self.mch_free_time[self.incomplete_env_idx, chosen_mch] = self.op_ct[self.incomplete_env_idx, chosen_op]
 
         true_chosen_op_st = np.maximum(self.true_candidate_free_time[self.incomplete_env_idx, chosen_job],
@@ -259,7 +356,7 @@ class FJSPEnvForVariousOpNums:
         self.true_op_ct[self.incomplete_env_idx, chosen_op] = true_chosen_op_st + self.true_op_pt[
             self.incomplete_env_idx, chosen_op, chosen_mch]
         self.true_candidate_free_time[self.incomplete_env_idx, chosen_job] = self.true_op_ct[
-            self.incomplete_env_idx, chosen_op]
+            self.incomplete_env_idx, chosen_op] + self.true_op_lag[self.incomplete_env_idx, chosen_op]
         self.true_mch_free_time[self.incomplete_env_idx, chosen_mch] = self.true_op_ct[
             self.incomplete_env_idx, chosen_op]
 
@@ -318,6 +415,15 @@ class FJSPEnvForVariousOpNums:
         self.op_remain_work = np.maximum(self.op_ct -
                                          np.expand_dims(self.next_schedule_time, axis=1), 0)
 
+        # (PPVC, Adaptation 2b) remaining lag of each scheduled op at the
+        # decision instant: the lag window is [op_ct, op_ct + lag], so the
+        # remaining part is clip(op_ct + lag - t, 0, lag). Unscheduled and
+        # dummy ops show 0; the static op_lag channel carries their lag.
+        if self.use_lag_features:
+            self.op_remain_lag = self.op_scheduled_flag * np.clip(
+                self.op_ct + self.op_lag - self.next_schedule_time[:, np.newaxis],
+                0, self.op_lag)
+
         self.construct_op_features()
 
         self.dynamic_pair_mask = np.copy(self.candidate_process_relation)
@@ -352,7 +458,7 @@ class FJSPEnvForVariousOpNums:
 
         self.state.update(self.fea_j, self.op_mask, self.fea_m, self.mch_mask,
                           self.dynamic_pair_mask, self.comp_idx, self.candidate,
-                          self.fea_pairs)
+                          self.fea_pairs, op_type=self.op_type, mch_type=self.mch_type)
         self.done_flag = self.done()
 
         return self.state, np.array(reward), self.done_flag
@@ -361,17 +467,27 @@ class FJSPEnvForVariousOpNums:
         return self.step_count >= self.env_number_of_ops
 
     def construct_op_features(self):
-
-        self.fea_j = np.stack((self.op_scheduled_flag,
-                               self.op_ct_lb,
-                               self.op_min_pt,
-                               self.pt_span,
-                               self.op_mean_pt,
-                               self.op_waiting_time,
-                               self.op_remain_work,
-                               self.op_match_job_left_op_nums,
-                               self.op_match_job_remain_work,
-                               self.op_available_mch_nums), axis=2)
+        """
+            construct operation raw features, then normalize them over the
+            live (neither deleted nor dummy) operations of each instance
+        """
+        feature_channels = [self.op_scheduled_flag,
+                            self.op_ct_lb,
+                            self.op_min_pt,
+                            self.pt_span,
+                            self.op_mean_pt,
+                            self.op_waiting_time,
+                            self.op_remain_work,
+                            self.op_match_job_left_op_nums,
+                            self.op_match_job_remain_work,
+                            self.op_available_mch_nums]
+        # (PPVC, Adaptation 2b) anticipatory lag channels: the static lag an
+        # op will impose once scheduled, and the lag still pending for
+        # scheduled ops. Both pass through the same normalization below.
+        if self.use_lag_features:
+            feature_channels.append(self.op_lag)
+            feature_channels.append(self.op_remain_lag)
+        self.fea_j = np.stack(feature_channels, axis=2)
 
         if self.flag_exist_dummy_node:
             mask_all = np.logical_or(self.dummy_mask_fea_j, self.delete_mask_fea_j)
@@ -381,6 +497,12 @@ class FJSPEnvForVariousOpNums:
         self.norm_operation_features(mask=mask_all)
 
     def norm_operation_features(self, mask):
+        """
+            z-normalize the operation features across operations, excluding
+            the masked (deleted and dummy) rows from the mean. With
+            isolate_padding the dummy rows are also excluded from the
+            variance and end as zero rows, like deleted rows.
+        """
         self.fea_j[mask] = 0
         num_delete_nodes = np.count_nonzero(mask[:, :, 0], axis=1)
 
@@ -391,7 +513,10 @@ class FJSPEnvForVariousOpNums:
 
         mean_fea_j = np.sum(self.fea_j, axis=1) / num_left_nodes
 
-        temp = np.where(self.delete_mask_fea_j,
+        # original DANIEL: only deleted rows are replaced by the mean, so
+        # dummy rows enter the variance as zeros
+        fill_mask = mask if self.isolate_padding else self.delete_mask_fea_j
+        temp = np.where(fill_mask,
                         mean_fea_j[:, np.newaxis, :], self.fea_j)
         var_fea_j = np.var(temp, axis=1)
 
@@ -484,11 +609,22 @@ class FJSPEnvForVariousOpNums:
                                fill_value=0, dtype=np.float32)
         self.op_mask[self.env_job_idx, self.job_first_op_id, 0] = 1
         self.op_mask[self.env_job_idx, self.job_last_op_id, 2] = 1
+        # with isolate_padding, a dummy op has neither predecessor nor
+        # successor edge, so its zero feature row stays zero through the
+        # attention layers (it cannot receive the real last op's message)
+        if self.isolate_padding:
+            self.op_mask[self.mask_dummy_node, 0] = 1
+            self.op_mask[self.mask_dummy_node, 2] = 1
 
     def update_op_mask(self):
         object_mask = np.zeros_like(self.op_mask)
         object_mask[:, :, 2] = self.deleted_op_nodes
         object_mask[:, 1:, 0] = self.deleted_op_nodes[:, :-1]
+        # op 0 takes its predecessor from the last row through the circular
+        # roll in the attention layer; mask that edge from the last row's
+        # deletion (a no-op in practice: op 0 is a job-first op, whose
+        # predecessor edge is masked from the start), as in the same-op env
+        object_mask[:, 0, 0] = self.deleted_op_nodes[:, -1]
         self.op_mask = np.logical_or(object_mask, self.op_mask).astype(np.float32)
 
     def logic_operator(self, x, flagT=True):

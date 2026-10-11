@@ -79,6 +79,7 @@ ARCH_KEYS = (
     'num_mlp_layers_actor', 'hidden_dim_actor',
     'num_mlp_layers_critic', 'hidden_dim_critic',
     'dropout_prob',
+    'framework',
 )
 
 
@@ -91,6 +92,10 @@ def load_train_config(model_name):
     for k in ARCH_KEYS:
         if k in snap:
             setattr(configs, k, snap[k])
+    # snapshots written before --framework existed are DANIEL
+    configs.framework = snap.get('framework', 'DANIEL')
+    from common_utils import check_backbone_tag
+    check_backbone_tag(model_name, configs.framework)
     # keep CPU even though the snapshot says cuda
     configs.device = 'cpu'
     return snap

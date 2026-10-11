@@ -1,0 +1,10 @@
+{
+ "seed0": 50000,
+ "n_instances": 100,
+ "n_modules": 10,
+ "ppvc_mix": "mixed",
+ "ppvc_factory": "default",
+ "purpose": "shifted-lag transfer test set: 10x25+ppvc-mixed with every lag x1.5 (rounded)",
+ "lag_scale": 1.5,
+ "source_set": "10x25+ppvc-mixed"
+}

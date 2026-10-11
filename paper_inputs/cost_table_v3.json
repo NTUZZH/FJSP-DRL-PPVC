@@ -1,0 +1,683 @@
+{
+ "machine": {
+  "cpu": "Intel(R) Core(TM) Ultra 9 285K",
+  "n_cpus": 24,
+  "torch": "2.11.0+cu128",
+  "python": "3.11.15",
+  "gpu": {
+   "name": "NVIDIA RTX PRO 5000 Blackwell",
+   "utilization_pct": 0.0,
+   "memory_used_MB": 94.0,
+   "memory_total_MB": 48935.0,
+   "compute_processes": 0
+  }
+ },
+ "runs": [
+  {
+   "measured_at": "2026-10-10T15:59:02",
+   "models": [
+    "10x25+ppvc-mixed+a1lagx05-2k-s301",
+    "10x25+ppvc-mixed+plan-a1lagx05-2k-s301"
+   ],
+   "datasets": [
+    "10x25",
+    "20x25",
+    "30x25",
+    "50x25",
+    "80x25"
+   ],
+   "phases": [
+    "cpu"
+   ],
+   "load_avg_start": [
+    0.9,
+    0.77,
+    1.29
+   ],
+   "affinity": [
+    18
+   ],
+   "env_threads": {
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1"
+   },
+   "pinned_cores_busy_before": {
+    "18": 0.005
+   },
+   "cpu_worker": {
+    "device": "cpu",
+    "load_avg_start": [
+     0.91,
+     0.77,
+     1.29
+    ],
+    "torch_threads": 1,
+    "torch_interop_threads": 1,
+    "torch_version": "2.11.0+cu128",
+    "budget_exhausted": false,
+    "load_avg_end": [
+     1.27,
+     1.12,
+     1.19
+    ],
+    "phase_seconds": 732.6656233603135
+   },
+   "gpu_status": "not run (--gpu off)",
+   "load_avg_end": [
+    1.25,
+    1.12,
+    1.19
+   ]
+  }
+ ],
+ "models": [
+  "10x25+ppvc-mixed+a1lagx05-2k-s301",
+  "10x25+ppvc-mixed+plan-a1lagx05-2k-s301"
+ ],
+ "datasets": [
+  "10x25",
+  "20x25",
+  "30x25",
+  "50x25",
+  "80x25"
+ ],
+ "static": {
+  "10x25+ppvc-mixed+a1lagx05-2k-s301": {
+   "framework": "DANIEL",
+   "params_total": 28834,
+   "params_critic": 5313,
+   "params_without_critic": 23521,
+   "checkpoint_bytes": 139883,
+   "trained_updates": 2000,
+   "train_n_j": 10,
+   "train_factory": "default",
+   "train_device": "cuda"
+  },
+  "10x25+ppvc-mixed+plan-a1lagx05-2k-s301": {
+   "framework": "PLAN",
+   "params_total": 13506,
+   "params_critic": 5313,
+   "params_without_critic": 8193,
+   "checkpoint_bytes": 70709,
+   "trained_updates": 2000,
+   "train_n_j": 10,
+   "train_factory": "default",
+   "train_device": "cuda"
+  }
+ },
+ "training": {
+  "10x25+ppvc-mixed+a1lagx05-2k-s301": {
+   "recorded": false,
+   "note": "no entry in train_time.txt (run not completed or not logged)"
+  },
+  "10x25+ppvc-mixed+plan-a1lagx05-2k-s301": {
+   "recorded": true,
+   "start": "2026-10-09T09:36:58",
+   "wall_seconds": 10576.28,
+   "wall_hours": 2.9378555555555557,
+   "quantity": "wall-clock hours of the training process on one GPU (train_time.txt: first to last update, validation included)",
+   "overlapping_runs_in_log": [],
+   "contended": null,
+   "contention_note": "no overlap with runs logged in train_time.txt; other projects sharing the GPU are not logged, so a quiet GPU is not established"
+  }
+ },
+ "training_seed_groups": {
+  "10x25+ppvc-mixed+a1lagx05-2k-s301": null,
+  "10x25+ppvc-mixed+plan-a1lagx05-2k-s301": null
+ },
+ "cpu": {
+  "10x25+ppvc-mixed+a1lagx05-2k-s301": {
+   "_params_module": 28834,
+   "10x25": {
+    "dataset": "10x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 220,
+    "latency_s_per_instance_mean": 0.7313924863934517,
+    "latency_ms_per_decision_mean": 3.3245113017884167,
+    "latency_ms_per_decision_min": 3.3190615729174833,
+    "forward_ms_per_decision_mean": 2.5970149251886387,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 195.0,
+      "seconds": 0.7323274970985949,
+      "forward_seconds": 0.5722723300568759,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 215.0,
+      "seconds": 0.7314850967377424,
+      "forward_seconds": 0.5715549127198756,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 205.0,
+      "seconds": 0.7301935460418463,
+      "forward_seconds": 0.5696830060333014,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 221.0,
+      "seconds": 0.7318067159503698,
+      "forward_seconds": 0.5721266721375287,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 227.0,
+      "seconds": 0.731149576138705,
+      "forward_seconds": 0.5710794967599213,
+      "decisions": 220
+     }
+    ],
+    "load_avg": [
+     0.92,
+     0.78,
+     1.29
+    ],
+    "peak_rss_MB": 505.62890625,
+    "rss_before_rollouts_MB": 505.23828125,
+    "run": 0
+   },
+   "20x25": {
+    "dataset": "20x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 440,
+    "latency_s_per_instance_mean": 1.7240756300278008,
+    "latency_ms_per_decision_mean": 3.918353704608638,
+    "latency_ms_per_decision_min": 3.9085773317227988,
+    "forward_ms_per_decision_mean": 3.06565662634305,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 253.0,
+      "seconds": 1.7197905401699245,
+      "forward_seconds": 1.3446829849854112,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 251.0,
+      "seconds": 1.737714665941894,
+      "forward_seconds": 1.3610726264305413,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 263.0,
+      "seconds": 1.722084476146847,
+      "forward_seconds": 1.3472948898561299,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 251.0,
+      "seconds": 1.721014441922307,
+      "forward_seconds": 1.3463829993270338,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 258.0,
+      "seconds": 1.7197740259580314,
+      "forward_seconds": 1.3450110773555934,
+      "decisions": 440
+     }
+    ],
+    "load_avg": [
+     0.93,
+     0.79,
+     1.28
+    ],
+    "peak_rss_MB": 506.90625,
+    "rss_before_rollouts_MB": 505.62890625,
+    "run": 0
+   },
+   "30x25": {
+    "dataset": "30x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 660,
+    "latency_s_per_instance_mean": 2.958184464648366,
+    "latency_ms_per_decision_mean": 4.482097673709646,
+    "latency_ms_per_decision_min": 4.476584053146794,
+    "forward_ms_per_decision_mean": 3.5026059978444017,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 300.0,
+      "seconds": 2.9581288089975715,
+      "forward_seconds": 2.313677945639938,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 314.0,
+      "seconds": 2.956660205963999,
+      "forward_seconds": 2.310886790510267,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 322.0,
+      "seconds": 2.9650207362137735,
+      "forward_seconds": 2.3143936446867883,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 309.0,
+      "seconds": 2.954545475076884,
+      "forward_seconds": 2.3083079969510436,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 301.0,
+      "seconds": 2.956567096989602,
+      "forward_seconds": 2.3113334150984883,
+      "decisions": 660
+     }
+    ],
+    "load_avg": [
+     1.03,
+     0.81,
+     1.28
+    ],
+    "peak_rss_MB": 508.359375,
+    "rss_before_rollouts_MB": 506.90625,
+    "run": 0
+   },
+   "50x25": {
+    "dataset": "50x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 1100,
+    "latency_s_per_instance_mean": 6.219429888390005,
+    "latency_ms_per_decision_mean": 5.654027171263641,
+    "latency_ms_per_decision_min": 5.63873154534535,
+    "forward_ms_per_decision_mean": 4.418469077314843,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 406.0,
+      "seconds": 6.252037378959358,
+      "forward_seconds": 4.878744592890143,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 397.0,
+      "seconds": 6.204339093063027,
+      "forward_seconds": 4.851041042711586,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 414.0,
+      "seconds": 6.21053094509989,
+      "forward_seconds": 4.854180304333568,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 416.0,
+      "seconds": 6.202604699879885,
+      "forward_seconds": 4.848199193831533,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 412.0,
+      "seconds": 6.227637324947864,
+      "forward_seconds": 4.869414791464806,
+      "decisions": 1100
+     }
+    ],
+    "load_avg": [
+     1.1,
+     0.85,
+     1.28
+    ],
+    "peak_rss_MB": 510.88671875,
+    "rss_before_rollouts_MB": 508.25390625,
+    "run": 0
+   },
+   "80x25": {
+    "dataset": "80x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 1760,
+    "latency_s_per_instance_mean": 12.981900300830603,
+    "latency_ms_per_decision_mean": 7.376079716381024,
+    "latency_ms_per_decision_min": 7.358629009104334,
+    "forward_ms_per_decision_mean": 5.772650412823582,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 559.0,
+      "seconds": 13.000360914040357,
+      "forward_seconds": 10.16655946103856,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 551.0,
+      "seconds": 13.003976325970143,
+      "forward_seconds": 10.180821858346462,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 564.0,
+      "seconds": 12.951187056023628,
+      "forward_seconds": 10.144785835873336,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 579.0,
+      "seconds": 12.970576982013881,
+      "forward_seconds": 10.154872544575483,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 568.0,
+      "seconds": 12.983400226105005,
+      "forward_seconds": 10.152283933013678,
+      "decisions": 1760
+     }
+    ],
+    "load_avg": [
+     1.19,
+     0.94,
+     1.27
+    ],
+    "peak_rss_MB": 515.0390625,
+    "rss_before_rollouts_MB": 510.88671875,
+    "run": 0
+   }
+  },
+  "10x25+ppvc-mixed+plan-a1lagx05-2k-s301": {
+   "_params_module": 13506,
+   "10x25": {
+    "dataset": "10x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 220,
+    "latency_s_per_instance_mean": 0.4352079523727298,
+    "latency_ms_per_decision_mean": 1.97821796533059,
+    "latency_ms_per_decision_min": 1.9753391727466474,
+    "forward_ms_per_decision_mean": 1.250985281711275,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 196.0,
+      "seconds": 0.4361261981539428,
+      "forward_seconds": 0.2758525162935257,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 216.0,
+      "seconds": 0.4350624023936689,
+      "forward_seconds": 0.27487097308039665,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 210.0,
+      "seconds": 0.4351421813480556,
+      "forward_seconds": 0.27563542360439897,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 212.0,
+      "seconds": 0.43513436196371913,
+      "forward_seconds": 0.274896047078073,
+      "decisions": 220
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 232.0,
+      "seconds": 0.43457461800426245,
+      "forward_seconds": 0.2748288498260081,
+      "decisions": 220
+     }
+    ],
+    "load_avg": [
+     1.19,
+     0.94,
+     1.27
+    ],
+    "peak_rss_MB": 515.4453125,
+    "rss_before_rollouts_MB": 515.4453125,
+    "run": 0
+   },
+   "20x25": {
+    "dataset": "20x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 440,
+    "latency_s_per_instance_mean": 1.4304151897318662,
+    "latency_ms_per_decision_mean": 3.250943613026968,
+    "latency_ms_per_decision_min": 3.244974036616358,
+    "forward_ms_per_decision_mean": 2.3979690749282865,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 253.0,
+      "seconds": 1.4350880943238735,
+      "forward_seconds": 1.059702759142965,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 250.0,
+      "seconds": 1.4298466769978404,
+      "forward_seconds": 1.055344988591969,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 268.0,
+      "seconds": 1.4277885761111975,
+      "forward_seconds": 1.053191488608718,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 253.0,
+      "seconds": 1.4290109840221703,
+      "forward_seconds": 1.0534759447909892,
+      "decisions": 440
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 262.0,
+      "seconds": 1.430341617204249,
+      "forward_seconds": 1.053816783707589,
+      "decisions": 440
+     }
+    ],
+    "load_avg": [
+     1.16,
+     0.94,
+     1.27
+    ],
+    "peak_rss_MB": 515.5546875,
+    "rss_before_rollouts_MB": 515.4453125,
+    "run": 0
+   },
+   "30x25": {
+    "dataset": "30x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 660,
+    "latency_s_per_instance_mean": 5.15381083926186,
+    "latency_ms_per_decision_mean": 7.80880430191191,
+    "latency_ms_per_decision_min": 7.798632974454174,
+    "forward_ms_per_decision_mean": 6.5606818801130755,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 294.0,
+      "seconds": 5.14812948834151,
+      "forward_seconds": 4.325112085323781,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 331.0,
+      "seconds": 5.157281836960465,
+      "forward_seconds": 4.332970574032515,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 309.0,
+      "seconds": 5.168460432905704,
+      "forward_seconds": 4.342778159305453,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 306.0,
+      "seconds": 5.1470977631397545,
+      "forward_seconds": 4.323921840172261,
+      "decisions": 660
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 307.0,
+      "seconds": 5.148084674961865,
+      "forward_seconds": 4.325467545539141,
+      "decisions": 660
+     }
+    ],
+    "load_avg": [
+     1.11,
+     0.95,
+     1.26
+    ],
+    "peak_rss_MB": 528.7265625,
+    "rss_before_rollouts_MB": 515.5546875,
+    "run": 0
+   },
+   "50x25": {
+    "dataset": "50x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 1100,
+    "latency_s_per_instance_mean": 23.430011193826793,
+    "latency_ms_per_decision_mean": 21.30001017620618,
+    "latency_ms_per_decision_min": 21.292336294427514,
+    "forward_ms_per_decision_mean": 19.44525220947848,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 410.0,
+      "seconds": 23.429014921188354,
+      "forward_seconds": 21.39464739570394,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 420.0,
+      "seconds": 23.432078049052507,
+      "forward_seconds": 21.39010711433366,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 421.0,
+      "seconds": 23.434113098308444,
+      "forward_seconds": 21.393173788208514,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 420.0,
+      "seconds": 23.433279976714402,
+      "forward_seconds": 21.388459307141602,
+      "decisions": 1100
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 406.0,
+      "seconds": 23.421569923870265,
+      "forward_seconds": 21.38249954674393,
+      "decisions": 1100
+     }
+    ],
+    "load_avg": [
+     1.06,
+     1.0,
+     1.25
+    ],
+    "peak_rss_MB": 553.15234375,
+    "rss_before_rollouts_MB": 515.26953125,
+    "run": 0
+   },
+   "80x25": {
+    "dataset": "80x25+ppvc-mixed",
+    "n_instances": 5,
+    "decisions_per_instance": 1760,
+    "latency_s_per_instance_mean": 91.18707410441712,
+    "latency_ms_per_decision_mean": 51.81083755932791,
+    "latency_ms_per_decision_min": 51.33808365393303,
+    "forward_ms_per_decision_mean": 49.826240382337176,
+    "instances": [
+     {
+      "instance": "instance_000",
+      "makespan": 679.0,
+      "seconds": 91.89048577286303,
+      "forward_seconds": 88.39687122497708,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_001",
+      "makespan": 566.0,
+      "seconds": 91.84136971505359,
+      "forward_seconds": 88.33810116257519,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_002",
+      "makespan": 574.0,
+      "seconds": 91.46942041488364,
+      "forward_seconds": 87.98062060354277,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_003",
+      "makespan": 568.0,
+      "seconds": 90.35502723092213,
+      "forward_seconds": 86.87400653352961,
+      "decisions": 1760
+     },
+     {
+      "instance": "instance_004",
+      "makespan": 584.0,
+      "seconds": 90.37906738836318,
+      "forward_seconds": 86.88131583994254,
+      "decisions": 1760
+     }
+    ],
+    "load_avg": [
+     1.27,
+     1.12,
+     1.19
+    ],
+    "peak_rss_MB": 628.30859375,
+    "rss_before_rollouts_MB": 518.91796875,
+    "run": 0
+   }
+  }
+ },
+ "gpu": {},
+ "notes": [
+  "Latency = one full greedy schedule of one instance (all decisions), batch of 1, environment initialisation excluded; forward = policy network only.",
+  "Parameter counts are read from the checkpoint state dict (actor, critic, feature extractor, type embeddings); the critic is not needed for deployment.",
+  "Training wall-clock is from train_time.txt; see training[*].quantity and contention_note.",
+  "Each run records the load average and the busy fraction of its pinned cores; latencies measured on busy cores or a busy GPU are upper bounds."
+ ]
+}

@@ -93,8 +93,38 @@ parser.add_argument('--ppvc_vali_sizes', type=str, default='10,20',
                     help="Module counts of the size-mixed validation set (only used when "
                          "--ppvc_size_mix is set). Model selection minimises the mean of "
                          "per-size makespan normalised by a fixed SPT scale.")
+parser.add_argument('--ppvc_route_variant', type=str, default='fixed', choices=['fixed', 'variable'],
+                    help="PPVC module routes: 'fixed' (every module has 22 operations, default) or "
+                         "'variable' (modules omit optional operations, 18-22 operations each; "
+                         "uses FJSPEnvForVariousOpNums and the '-var' data name suffix)")
+parser.add_argument('--bound_lag_free', type=str2bool, default=False,
+                    help="(Ablation of Adaptation 2a) compute the completion-time lower bound "
+                         "without the predecessor time-lag term (original DANIEL per-job cumsum); "
+                         "the environment dynamics keep the lags. Fixed-route env only. "
+                         "Recorded in the config snapshot; eval_ppvc.py applies it from there.")
+parser.add_argument('--ppvc_lag_cv', type=float, default=0.0,
+                    help="Lag randomization in PPVC training: every training instance's nonzero lags "
+                         "are multiplied by a per-op lognormal factor (mean 1, this coefficient of "
+                         "variation, truncated to [0.5, 2.0]) and rounded to whole hours, the lag "
+                         "model of eval_stochastic_lags.py. Validation instances keep nominal lags. "
+                         "0 = off (default, sampled instances unchanged).")
+
+# args for fine-tuning / transfer (PPVC)
+parser.add_argument('--init_from', type=str, default='',
+                    help="Fine-tuning: model name of a checkpoint under trained_network/<data_source>/ "
+                         "whose weights are loaded (strict) before training. Its config snapshot must "
+                         "match this run's architecture flags. Validation quality is logged once at "
+                         "update 0, before any gradient step. Empty = train from scratch.")
+parser.add_argument('--lag_scale', type=float, default=1.0,
+                    help="Multiply every nominal time-lag of the PPVC training AND validation instances "
+                         "by this factor and round to whole hours (shifted lag distribution for the "
+                         "transfer study). 1.0 = unchanged. Evaluation scripts keep the dataset's own lags.")
 
 # args for network
+parser.add_argument('--framework', type=str, default='DANIEL', choices=['DANIEL', 'PLAN'],
+                    help="Policy backbone: 'DANIEL' (dual attention network, default) or 'PLAN' "
+                         "(parallel attention + liquid Euler encoder, model/plan.py). PLAN "
+                         "checkpoints and result files carry the 'plan-' model-name prefix.")
 parser.add_argument('--fea_j_input_dim', type=int, default=10, help='Dimension of operation raw feature vectors')
 parser.add_argument('--fea_m_input_dim', type=int, default=8, help='Dimension of machine raw feature vectors')
 
