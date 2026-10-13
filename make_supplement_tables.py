@@ -9,16 +9,32 @@ Writes to paper_tables/supplement/ (or $SUPP_OUT_DIR, or --out_dir):
                       the paired difference to SPT, its 95% bootstrap CI and
                       the shorter/equal/longer counts against SPT
   s1_long.tex         CP-SAT given 1800 s on the first 20 orders
+  s1_workers.tex      CP-SAT with 4 and 16 workers, first 20 orders, 80 modules
+  s1_shellsearch.tex  single-shell orders, 50 modules, first 20: SPT, memetic,
+                      CP-SAT from SPT, SLAB
   s1_ind.tex          independent test sets
   s1_mix.tex          size-mixed training pilot and its single-size match
+  s1_shell.tex        single-shell project orders (RC or steel shells only),
+                      SLAB per seed and mean against the rules
+  s1_reach.tex        share of orders on which CP-SAT reaches the SLAB seed
+                      mean within 1 s, 5 s, 60 s and its limit, median time
   s2_stats.tex        Wilcoxon p, Holm-adjusted p, rank-biserial r
+  s2_train.tex        the same tests for Table VII of the paper (training orders)
+  s2_uncertain.tex    the same tests for Table VIII (uncertain waits)
+  s2_disrupt10.tex,   the same tests for Table IX (disruptions) at 10 and at
+  s2_disrupt50.tex    50 modules; not written when PAPER_DISRUPT_STATS=0
   s3_hgnn.tex         HGNN training options and checkpoint-selection rules
   s4_bound.tex        full waits, lag-augmented versus lag-free bound
   s4_aids.tex         full waits, with and without the input aids
+  s4_tightness.tex    bound/makespan of both bounds at s_0 and over the states
   s5_byproducts.tex   flow time, work in progress, utilization, tardiness
   s6_flowline.tex     flow-line routing versus flexible routing
   s7_sensitivity.tex  processing-time and wait perturbations
   s8_stability.tex    stability-aware residual CP-SAT frontier
+  s8_stability50.tex  the same at 50 modules (hinted, 30 s, weights 0 to 2)
+  s8_rules.tex        SLAB against the SPTL, SPT and LLF rules re-planning in
+                      the closed loop, per disruption type
+  s8_severity.tex     breakdown outage of 0.5 x mean processing time, 8 h, 24 h
   s10_routes.tex      operations, stations, durations and waits per route
   s10_stations.tex    station counts of the three factories
   s11_hyper.tex       PPO and network hyperparameters
@@ -49,6 +65,7 @@ import argparse
 import ast
 import glob
 import json
+import math
 import os
 import re
 import subprocess
@@ -346,24 +363,14 @@ def s1_size(S, ds, out_dir):
         means.append(c)
 
     rows.append(('BLOCK', 'Metaheuristics, one core'))
-    if S == 'Ten':
-        src(M.ma_rel(ds, 60))
-        c = num(lambda: M.memetic(ds, 60).mean(), 'h', 'MaSixtyTen')
-        rows.append(s1_row('Memetic, 60\\,s', c, lambda: M.memetic(ds, 60),
-                           spt, 'MaSixtyTen'))
+    for name, variant, label in (
+            (f'Ma{S}', 'pm1', 'Memetic, local search on every child, 300\\,s'),
+            (f'MaPub{S}', 'pub', 'Memetic, published local-search rate, 300\\,s')):
+        src(M.ma_rel(ds, 300, variant))
+        c = mac(name, lambda v=variant: M.memetic(ds, 300, v).mean(), 'h')
+        rows.append(s1_row(label, c, lambda v=variant: M.memetic(ds, 300, v),
+                           spt, name))
         means.append(c)
-    src(M.ma_rel(ds))
-    c = mac(f'Ma{S}', lambda: M.memetic(ds).mean(), 'h')
-    rows.append(s1_row('Memetic, 300\\,s', c, lambda: M.memetic(ds), spt,
-                       f'Ma{S}'))
-    means.append(c)
-    if S == 'Ten':
-        for name, b in (('GaSixtyTen', 60), ('GaThreeHundredTen', 300)):
-            src(M.ga_rel(ds, b))
-            c = mac(name, lambda b=b: M.ga(ds, b).mean(), 'h')
-            rows.append(s1_row(f'GA, {b}\\,s', c, lambda b=b: M.ga(ds, b),
-                               spt, name))
-            means.append(c)
 
     rows.append(('BLOCK', 'CP-SAT, four workers'))
     tb = M.cp_budget(S)
@@ -596,7 +603,8 @@ def s2_stats(out_dir):
             '$p$ & \\makecell{Holm-adjusted\\\\$p$} & $r$ \\\\']
     rows = []
     titles = {'Spt': 'Rival: SPT rule',
-              'Ma': 'Rival: memetic algorithm, 300\\,s',
+              'Ma': 'Rival: memetic algorithm, local search on every child, '
+                    '300\\,s',
               'CpWarm': 'Rival: CP-SAT from SPT, time limits of '
                         'Table~\\ref{M-tab:main} of the paper'}
     for R, _what in M.RIVALS:
@@ -1602,6 +1610,14 @@ def s11_protocols(out_dir):
             for key in ('drl_reactive', 'ga_reactive', 'cpsat_5', 'cpsat_30'):
                 for a in d['records'][key]['affinity']:
                     aff.update(int(x) for x in a)
+            # GA column of Table IX: fast-decoder rerun, same GA settings
+            try:
+                g = M.gafast_file(ds, dtype, n)
+                src(M.gafast_rel(ds, dtype))
+                for a in g['records']['ga_reactive']['affinity']:
+                    aff.update(int(x) for x in a)
+            except Missing as err:
+                PENDING.setdefault('GaFast', str(err))
     check(len(metas) == 12, f'{len(metas)} disruption files')
     keys = ('disruption_offset', 'lag_factor', 'pt_factor', 'shortage_factor',
             'ga_budget', 'ga_pop', 'cpsat_workers', 'seed_test',
@@ -1649,7 +1665,7 @@ def s11_protocols(out_dir):
     hints = set()
     for ds in ('10x25+ppvc-mixed', '50x25+ppvc-mixed'):
         for _T, dtype in M.DIS_TYPES:
-            rp = f'test_results/PPVC/{ds}/reactive_hstar_hint/residual_cpsat_{dtype}.npy'
+            rp = M.resid_rel(ds, dtype)   # re-solved files (2026-10-12)
             hints.add(np.load(os.path.join(REPO, rp), allow_pickle=True).item()['meta'].get('hint'))
     check(hints == {'right_shift'}, f'residual CP-SAT hints {hints}')
     cvs = sorted({round(float(r['cv']), 3) for r in recs})
@@ -1666,9 +1682,9 @@ def s11_protocols(out_dir):
         ['Coefficients of variation', ', '.join(dec(c, 1) for c in cvs)],
         ['Realizations per order and level', str(len(reps))],
         ['Seed of the wait realizations', str(lagseed)],
-        ['Nominal CP-SAT plan', '%d\\,s, %d workers at 10 modules; from the SPT '
-         'schedule, %d\\,s, %d workers at 50 modules'
-         % (nominal_s, workers, nominal50_s, workers50)],
+        ['Nominal CP-SAT plan, 10 modules', '%d\\,s, %d workers' % (nominal_s, workers)],
+        ['Nominal CP-SAT plan, 50 modules', 'from the SPT schedule, %d\\,s, %d workers'
+         % (nominal50_s, workers50)],
         ['Rolling CP-SAT re-solve', 'up to %d\\,s' % resolve_s],
         ('BLOCK', 'Disruptions (Table~\\ref{M-tab:disrupt} of the paper)'),
         ['Operations committed before the disruption',
@@ -1734,7 +1750,15 @@ TEST_SETS = (  # block, label, dataset
     ('Validation sets, halved waits', 'Default factory',
      'vali:10x25+ppvc-mixed-lagx0.5'),
     ('Validation sets, halved waits', 'Default factory',
-     'vali:20x25+ppvc-mixed-lagx0.5'))
+     'vali:20x25+ppvc-mixed-lagx0.5'),
+    ('Single-shell test sets', 'Default factory, RC shells',
+     '10x25+ppvc-rc_project-ind'),
+    ('Single-shell test sets', 'Default factory, steel shells',
+     '10x25+ppvc-steel_project-ind'),
+    ('Single-shell test sets', 'Default factory, RC shells',
+     '50x25+ppvc-rc_project'),
+    ('Single-shell test sets', 'Default factory, steel shells',
+     '50x25+ppvc-steel_project'))
 
 
 def s11_testsets(out_dir):
@@ -1765,7 +1789,8 @@ def s11_testsets(out_dir):
         if vali:
             check(float(meta['lag_scale']) == 0.5 and int(meta['seed0']) == 100,
                   f'{ds}: validation meta')
-        kind = 'vali' if vali else ('ind' if ds.endswith('-ind') else 'test')
+        kind = ('vali' if vali else 'shell' if '_project' in ds
+                else 'ind' if ds.endswith('-ind') else 'test')
         if 'lagx1.5' not in ds:   # these reuse the orders of their source set
             ranges.setdefault(kind, []).append(
                 (int(meta['seed0']), int(meta['seed0']) + n))
@@ -1789,16 +1814,43 @@ def s11_testsets(out_dir):
 # --------------------------------------------------------------------------- #
 def metaheuristic_constants():
     c = py_constants(os.path.join(REPO, 'eval_memetic.py'),
-                     ('NC', 'NP_RESTART', 'PM', 'NM', 'SEED_RULES'))
+                     ('NC', 'N1', 'NP_RESTART', 'PM', 'NM', 'SEED_RULES'))
+    # both memetic variants of the tables run the defaults of eval_memetic.py
+    # except the local-search rate pm (1.0 for the comparator of the paper,
+    # PM = 0.05 for the published rate), asserted on every result file
+    pms = {}
+    for v in ('pm1', 'pub'):
+        for _S, ds in M.SIZES:
+            try:
+                pr = M.memetic_file(ds, 300, v)['params']
+            except Missing as err:
+                WARN.append(f'memetic parameters not checked: {err}')
+                continue
+            check(int(pr['nc']) == c['NC'] and int(pr['np']) == c['NP_RESTART']
+                  and int(pr['nm']) == c['NM'] and int(pr['n1']) == c['N1']
+                  and tuple(pr['rules']) == tuple(c['SEED_RULES']),
+                  f'{M.ma_rel(ds, 300, v)}: parameters differ from eval_memetic.py')
+            pms.setdefault(v, set()).add(float(pr['pm']))
+    check(pms.get('pub', {c['PM']}) == {c['PM']}, f'published rate {pms.get("pub")}')
     supp('SuMaPop', str(c['NC']), 'eval_memetic.py', 'NC')
-    supp('SuMaShortS', '60', M.ma_rel(DS10, 60),
-         'budget of the shorter memetic run at 10 modules (s)')
+    supp('SuMaShortS', '60', 'test_results/PPVC/10x25+ppvc-mixed/'
+         'Result_MA60+memetic_10x25+ppvc-mixed.json (no longer in any table)',
+         'budget of the shorter memetic run at 10 modules (s); obsolete')
     supp('SuMaRestart', thousands(c['NP_RESTART']), 'eval_memetic.py',
          'NP_RESTART')
-    supp('SuMaLsProb', dec(100 * c['PM'], 0), 'eval_memetic.py', 'PM (%)')
+    if len(pms.get('pm1', ())) == 1:
+        supp('SuMaLsProb', dec(100 * pms['pm1'].pop(), 0),
+             'test_results/PPVC/<ds>/memetic_fast_pm1/Result_MA300+memetic_<ds>.json',
+             'params.pm of the comparator of the paper (%), equal in all five files')
+    else:
+        supp_pend('SuMaLsProb', 'memetic_fast_pm1', f'pm values {pms.get("pm1")}')
+    supp('SuMaPubLsProb', dec(100 * c['PM'], 0), 'eval_memetic.py',
+         'PM (%), the published rate (asserted on test_results/PPVC/<ds>/memetic_fast/)')
     supp('SuMaLsIter', str(c['NM']), 'eval_memetic.py', 'NM')
     supp('SuMaSeedRules', str(len(c['SEED_RULES'])), 'eval_memetic.py',
          'len(SEED_RULES)')
+    supp('SuMaRuleSeeds', str(c['N1']), 'eval_memetic.py',
+         'N1: rule-seeded schedules in the initial population (asserted as params.n1)')
     g = py_constants(os.path.join(REPO, 'eval_ga.py'), ('SEED_RULES',))
     with open(os.path.join(REPO, 'eval_ga.py')) as f:
         txt = f.read()
@@ -1994,6 +2046,675 @@ def reset():
     M.reset()
 
 
+# --------------------------------------------------------------------------- #
+# Revision results of 2026-10-12: S4 bound tightness, S1 single-shell orders
+# and CP-SAT time to reach SLAB, S2 paired tests of Tables VII and VIII. The
+# S2 tests of Table IX (s2_disrupt.tex) are written only when the environment
+# sets PAPER_DISRUPT_STATS=1 for both scripts. Each table is cross-checked
+# against the summary file of the analysis script that produced its source,
+# when that file is present and its sources are unchanged.
+# --------------------------------------------------------------------------- #
+TIGHT_SUMMARY = 'test_results/PPVC/bound_tightness/bound_tightness.json'
+SHELL_STATS = 'test_results/PPVC/shell_projects/shell_stats.json'
+REACH_JSON = 'test_results/PPVC/cpsat_time_to_slab/time_to_slab.json'
+X3_JSON = 'test_results/PPVC/stats_tables_7_9/stats.json'
+SHELL_TITLES = {'RcTen': '10 modules, RC shells',
+                'SteelTen': '10 modules, steel shells',
+                'RcFifty': '50 modules, RC shells',
+                'SteelFifty': '50 modules, steel shells'}
+DIS_LABELS = {'Lag': 'Wait doubled', 'Brk': 'Breakdown', 'Urg': 'Urgent module',
+              'Mat': 'Material delay', 'Ptd': 'Longer operation',
+              'Can': 'Cancellation'}
+S2_TEST_HEAD = ('\\makecell{SLAB minus\\\\rival (h)} & 95\\% CI (h) & $p$ & '
+                '\\makecell{Holm-adjusted\\\\$p$} & $r$ \\\\')
+
+
+def close(a, b, tol=1e-9):
+    return abs(float(a) - float(b)) <= tol * max(1.0, abs(float(b)))
+
+
+def summary_file(rel_p, what):
+    """An analysis summary used only for a cross-check; None (with a warning)
+    when absent."""
+    if not os.path.exists(os.path.join(REPO, rel_p)):
+        WARN.append(f'{rel_p} absent; {what} not cross-checked')
+        return None
+    try:
+        return M.read_json(os.path.join(REPO, rel_p))
+    except Missing as err:
+        WARN.append(f'{err}; {what} not cross-checked')
+        return None
+
+
+def test_cells(stem, col, test_fn, holm_name, holm_fn):
+    """Difference, CI, p, Holm-adjusted p and r of one paired test, each the
+    macro of the paper after its value is asserted."""
+    def get(k):
+        return lambda: test_fn()[k]
+    d = mac(f'Diff{stem}{col}', get('diff'), 'h')
+    lo = mac(f'CiLo{stem}{col}', get('lo'), 'h')
+    hi = mac(f'CiHi{stem}{col}', get('hi'), 'h')
+    p = mac(f'Pval{stem}{col}', get('p'), 'p')
+    ph = mac(holm_name, holm_fn, 'p')
+    r = mac(f'Rbis{stem}{col}', get('r'), 'r')
+    return [d, f'[{lo}, {hi}]', p, ph, r]
+
+
+def x3_rows(table, marker):
+    """Rows of one table of analysis_stats_tables_7_9.py, or None (with a
+    warning) when the file is absent or a source of that table (a path that
+    marker accepts) changed after the file was written."""
+    d = summary_file(X3_JSON, table)
+    if d is None:
+        return None
+    changed = [s for s, v in d['sources'].items() if marker(s) and (
+        not os.path.exists(os.path.join(REPO, s))
+        or M.sha256_of(s) != v['sha256'])]
+    if changed:
+        WARN.append(f'{X3_JSON}: {len(changed)} sources of {table} changed '
+                    f'after it was written (e.g. {changed[0]}); not cross-checked')
+        return None
+    return d[table]
+
+
+def x3_check(row, t, holm_p, where):
+    check(int(row['n']) == t['n'] and close(row['mean_diff'], t['diff'])
+          and close(row['ci95'][0], t['lo']) and close(row['ci95'][1], t['hi'])
+          and close(row['p'], t['p']) and close(row['p_holm'], holm_p)
+          and close(row['r'], t['r']),
+          f'{where}: differs from {X3_JSON}')
+
+
+# ---- S4 tightness of the two bounds ------------------------------------------
+def s4_tightness(out_dir):
+    head = [' & \\multicolumn{2}{c}{Bound/makespan at $s_0$} & '
+            '\\multicolumn{2}{c}{Bound/makespan, mean over states} \\\\',
+            '\\cmidrule(lr){2-3}\\cmidrule(l){4-5}',
+            'Modules & Lag-augmented & Lag-free & Lag-augmented & Lag-free \\\\']
+    summ = summary_file(TIGHT_SUMMARY, 'the S4 tightness table')
+    by = ({r['dataset']: r for r in summ['sizes']} if summ else {})
+    rows, states, viol, missing = [], 0, 0, None
+    for S, ds in M.SIZES:
+        src(M.tight_rel(ds))
+        src(M.s5_cpu_rel(ds))
+        row = [str(SIZE_NUM[S])]
+        for key, field, _w in M.TIGHT_FIELDS:
+            row.append(mac(f'BoundTight{key}{S}',
+                           lambda d=ds, f=field: M.tight_mean(d, f), 'share'))
+        if not any(c.pending for c in row[1:]):
+            # Section S4 states that the lag-augmented bound is the tighter
+            # one at every size, at s_0 and on average
+            check(row[1].value > row[2].value and row[3].value > row[4].value,
+                  f'S4 tightness at {S}: lag-free bound not looser')
+        try:
+            states += M.tight_states(ds)
+            viol += M.tight_violations(ds)
+            if ds in by:
+                s = by[ds]
+                check(int(s['n_steps_total']) == M.tight_states(ds)
+                      and int(s['n_steps_aug_env_above_cmax'])
+                      == M.tight_violations(ds)
+                      and all(close(s[f'mean_{f}'], M.tight_mean(ds, f))
+                              for _k, f, _w in M.TIGHT_FIELDS),
+                      f'{TIGHT_SUMMARY}: {ds} differs from the per-order file')
+            elif summ:
+                WARN.append(f'{TIGHT_SUMMARY}: no row for {ds}')
+        except Missing as err:
+            missing = str(err)
+        rows.append(row)
+    s = 'test_results/PPVC/bound_tightness/bound_tightness_<ds>.json'
+    if missing:
+        supp_pend('SuTightStates', s, missing)
+        supp_pend('SuTightViolations', s, missing)
+    else:
+        # Section S4 states that Proposition 1 holds at every state
+        check(viol == 0, f'{viol} states with the lag-augmented bound above '
+                         'the makespan')
+        supp('SuTightStates', thousands(states), s,
+             'decision states s_0..s_T of every order at the five sizes '
+             '(SLAB seed 301, greedy, CPU)')
+        supp('SuTightViolations', str(viol), s,
+             'states at which the lag-augmented bound exceeds the makespan')
+    return write_table(out_dir, 's4_tightness.tex', '@{}rcccc@{}', head,
+                       rows, 5)
+
+
+# ---- S1 single-shell orders ------------------------------------------------------
+def shell_seed_ranges():
+    """The seed ranges of the single-shell sets are disjoint from those of
+    every test, independent and validation set of Table S19 and from each
+    other."""
+    ranges = []
+    for _b, _l, key in TEST_SETS:
+        vali = key.startswith('vali:')
+        ds = key[5:] if vali else key
+        if 'lagx1.5' in ds or any(ds == x[1] for x in M.SHELL_SETS):
+            continue
+        base = (os.path.join(REPO, 'data', 'data_train_vali', 'PPVC', ds)
+                if vali else os.path.join(M.DATA, ds))
+        m = M.read_json(os.path.join(base, 'dataset_meta.json'))
+        ranges.append((ds, int(m['seed0']), int(m['seed0']) + int(m['n_instances'])))
+    for _k, ds, _mix, _s0 in M.SHELL_SETS:
+        m = M.shell_meta(ds)
+        lo, hi = int(m['seed0']), int(m['seed0']) + int(m['n_instances'])
+        for other, a, b in ranges:
+            check(hi <= a or b <= lo, f'seeds of {ds} overlap those of {other}')
+        ranges.append((ds, lo, hi))
+
+
+def shell_row(label, mean_cell, ds, method):
+    t = M.shell_test(ds, method)
+    return [label, mean_cell, stext(dec(t['diff'], 1)), ci_text(t['lo'], t['hi']),
+            '%d/%d/%d' % (t['shorter'], t['equal'], t['longer']), fmt_p(t['p'])]
+
+
+def shell_check(stats, ds, method, name):
+    """Cross-check one comparison with shell_stats.json of
+    eval_shell_projects.py."""
+    if stats is None:
+        return
+    c = stats['sets'][ds]['comparisons'][name]
+    t = M.shell_test(ds, method)
+    check(close(c['mean_a'], t['mean_a']) and close(c['mean_b'], t['mean_b'])
+          and close(c['mean_diff'], t['diff']) and close(c['ci95'][0], t['lo'])
+          and close(c['ci95'][1], t['hi']) and close(c['p_wilcoxon'], t['p'])
+          and close(c['r_rank_biserial'], t['r'])
+          and (c['shorter'], c['equal'], c['longer'])
+          == (t['shorter'], t['equal'], t['longer']),
+          f'{SHELL_STATS}: {ds} {name} differs')
+
+
+def s1_shell(out_dir):
+    head = ['Method & Mean (h) & \\makecell{Difference\\\\to SPT (h)} & '
+            '95\\% CI (h) & \\makecell{Shorter/equal/\\\\longer than SPT} & '
+            '$p$ \\\\']
+    stats = summary_file(SHELL_STATS, 'the S1 single-shell table')
+    try:
+        shell_seed_ranges()
+    except Missing as err:
+        WARN.append(f'seed ranges of the single-shell sets not checked: {err}')
+    rows = []
+    for key, ds, _mix, _s0 in M.SHELL_SETS:
+        n = M.N_INST[ds]
+        rows.append(('BLOCK', f'{SHELL_TITLES[key]}, {n} orders'))
+        for m in M.SHELL_RULES + tuple(M.shell_seed(s) for s in M.SEEDS):
+            src(M.shell_rel(ds, m))
+        try:
+            means = {r: float(M.shell(ds, r).mean()) for r in M.SHELL_RULES}
+            seeds = {s: float(M.shell(ds, M.shell_seed(s)).mean()) for s in M.SEEDS}
+        except Missing as err:
+            p = pend(f'Shell{key}', str(err))
+            rows.append(['SLAB'] + [p.text] * 5)
+            continue
+        others = [r for r in M.SHELL_RULES if r not in ('SPT', 'LLF')]
+        best = min(others, key=lambda r: (means[r], M.SHELL_RULES.index(r)))
+        spt = mac(f'ShellSpt{key}', lambda: means['SPT'], 'h')
+        block = [['SPT', spt, DASH, DASH, DASH, DASH]]
+        bolded = [spt]
+        for label, r in (('LLF', 'LLF'), (f'{best} (best other rule)', best)):
+            c = num(lambda r=r: means[r], 'h', f'Shell{r}{key}')
+            block.append(shell_row(label, c, ds, r))
+            bolded.append(c)
+        for s in M.SEEDS:
+            c = num(lambda s=s: seeds[s], 'h', f'ShellSeed{key}')
+            block.append(shell_row(f'Seed {s}', c, ds, M.shell_seed(s)))   # not bolded
+        slab = mac(f'ShellSlab{key}', lambda: float(np.mean(list(seeds.values()))),
+                   'h')
+        block.append(shell_row('Mean of three seeds', slab, ds, 'mean'))
+        bolded.append(slab)
+        bold_best(bolded)
+        rows += block
+        # the derived macros of the paper agree with the rows of this block
+        mac(f'ShellSeedWins{key}', lambda: sum(
+            1 for s in M.SEEDS if M.shell_test(ds, M.shell_seed(s))['hi'] < 0),
+            'int')
+        mac(f'ShellGain{key}', lambda: -M.pct(float(fmt('h', np.mean(list(
+            seeds.values())))), float(fmt('h', means['SPT']))), 'pct')
+        if stats is not None:
+            mm = stats['sets'][ds]['mean_makespan']
+            check(all(close(mm[r], means[r]) for r in M.SHELL_RULES)
+                  and all(close(mm[f'SLAB s{s}'], seeds[s]) for s in M.SEEDS)
+                  and close(mm['SLAB seed mean'], np.mean(list(seeds.values()))),
+                  f'{SHELL_STATS}: {ds} means differ')
+            shell_check(stats, ds, 'mean', 'seed mean vs SPT')
+            for s in M.SEEDS:
+                shell_check(stats, ds, M.shell_seed(s), f's{s} vs SPT')
+    return write_table(out_dir, 's1_shell.tex', '@{}lccccc@{}', head, rows, 6)
+
+
+# ---- S1 CP-SAT time to reach SLAB --------------------------------------------------
+def s1_reach(out_dir):
+    head = [' & & \\multicolumn{4}{c}{Orders that reach SLAB within (\\%)} & \\\\',
+            '\\cmidrule(lr){3-6}',
+            'Modules & Start & 1\\,s & 5\\,s & 60\\,s & Limit & '
+            '\\makecell{Median\\\\time (s)} \\\\']
+    x4 = summary_file(REACH_JSON, 'the S1 time-to-reach table')
+    x4_runs = ({(r['dataset'], r['mode'], int(r['budget_s'])): r
+                for r in x4['runs']} if x4 else {})
+    starts = {'Cold': 'Cold start', 'Spt': 'From SPT'}
+    rows = []
+    for lim, sizes in ((300, ('Ten', 'Twenty', 'Thirty')),
+                       (600, ('Fifty', 'Eighty'))):
+        rows.append(('BLOCK', f'Time limit {lim}\\,s'))
+        for S in sizes:
+            ds = dict(M.SIZES)[S]
+            check(M.cp_budget(S) == lim, f'{S}: CP-SAT limit {M.cp_budget(S)}')
+            for M_, mode, _w in M.REACH_MODES:
+                src(M.any_rel(ds, mode, lim))
+                src(M.src(M.HSTAR, ds))
+                row = [str(SIZE_NUM[S]), starts[M_]]
+                for C, c in M.REACH_COLS:
+                    w = lim if c is None else c
+                    row.append(mac(f'CpReach{C}{M_}{S}',
+                                   lambda d=ds, m=mode, w=w: M.reach_share(d, m, lim, w),
+                                   'round_int'))
+                name = f'CpReachMed{M_}{S}'
+                try:
+                    med = M.reach_median(ds, mode, lim)
+                except Missing:
+                    med = None
+                if med is None or np.isfinite(med):
+                    row.append(mac(name, lambda d=ds, m=mode: M.reach_median(d, m, lim),
+                                   's'))
+                else:
+                    check(name not in MAC, f'{name} is defined although half or '
+                                           'more of the orders never reach SLAB')
+                    row.append(DASH)
+                r = x4_runs.get((ds, mode, lim))
+                if x4 is not None and med is not None:
+                    check(r is not None, f'{REACH_JSON}: no run {ds} {mode} {lim}')
+                    t = r['target_seed_mean']
+                    times = M.reach_times(ds, mode, lim, None)
+                    check(int(t['n_reached']) == int(np.sum(np.isfinite(times)))
+                          and all(int(t[f'n_within_{c}s']) == M.reach_count(ds, mode, lim, c)
+                                  for c in (1, 5, 60, lim))
+                          and (close(t['median_time_all_s'], med) if np.isfinite(med)
+                               else not np.isfinite(t['median_time_all_s'])),
+                          f'{REACH_JSON}: {ds} {mode} differs')
+                rows.append(row)
+    if x4 is not None:
+        r = x4_runs[(dict(M.SIZES)['Ten'], 'cold', 300)]
+        e = MAC['CpEndMedTen']
+        check(e['pending'] or close(r['median_solve_end_s'], e['raw']),
+              f'{REACH_JSON}: median solve end differs from CpEndMedTen')
+        e = MAC['CpReachLongFiftyEighty']
+        if not e['pending']:
+            check(sum(int(x['target_seed_mean']['n_reached']) for k, x in x4_runs.items()
+                      if k[2] == M.REACH_LONG_S) == int(e['raw']),
+                  f'{REACH_JSON}: 1800-s runs differ from CpReachLongFiftyEighty')
+    return write_table(out_dir, 's1_reach.tex', '@{}rlccccc@{}', head, rows, 7)
+
+
+# ---- S2 paired tests of Tables VII and VIII (and IX when enabled) -----------------
+TRAIN_TITLES = {
+    'LagFree': 'Rival: policy trained without waits',
+    'Full': 'Rival: policy trained with full waits',
+    'FullAids': 'Rival: policy trained with full waits and both aids',
+    'TightNet': 'Rival: policy trained with full waits and both aids on the '
+                '\\FactoryTight-station factory'}
+X3_TRAIN = {'Without waits': 'LagFree', 'Full waits': 'Full',
+            'Full waits, aids': 'FullAids',
+            'Full waits, aids, 15 stations': 'TightNet'}
+
+
+def s2_train(out_dir):
+    head = ['Modules & Orders & ' + S2_TEST_HEAD]
+    x3 = x3_rows('table_VII_training_orders', lambda s: '/Result_' in s)
+    x3_by = ({(X3_TRAIN[r['rival']], 'Tight' if r['size'].startswith('Tight')
+               else r['size']): r for r in x3} if x3 else {})
+    rows = []
+    for R, tpl, _w in M.TRAIN_RIVALS:
+        rows.append(('BLOCK', TRAIN_TITLES[R]))
+        for k, (S, ds) in enumerate(M.SIZES + (M.TIGHT,)):
+            src(M.src(M.HSTAR, ds))
+            src(M.src(tpl, ds))
+            if S == M.TIGHT[0]:
+                label = '10, \\FactoryTight{} stations'
+                n = num(lambda d=ds: M.N_INST[d], 'int', 'x')
+                hfn = (lambda r=R, d=ds: M.train_test(r, d)['p'])
+            else:
+                label = str(SIZE_NUM[S])
+                n = mac(f'nInst{S}', lambda d=ds: len(M.result(
+                    M.HSTAR.format(s=301), d)), 'int')
+                hfn = (lambda r=R, i=k: M.train_holm(r)[i])
+            cells = test_cells(f'Train{R}', S, lambda r=R, d=ds: M.train_test(r, d),
+                               f'PvalTrain{R}Holm{S}', hfn)
+            rows.append([label, n] + cells)
+            if x3 is not None and not cells[0].pending:
+                row = x3_by.get((R, S))
+                check(row is not None, f'{X3_JSON}: no Table VII row {R} {S}')
+                x3_check(row, M.train_test(R, ds), hfn(), f'Table VII {R} {S}')
+    return write_table(out_dir, 's2_train.tex', '@{}lrccccc@{}', head, rows, 7)
+
+
+X3_STOCH = {'SLAB, repair': 'Repair', 'SPT, re-plan': 'Spt',
+            'CP-SAT, repair': 'CpRepair', 'CP-SAT, rolling': 'CpRoll',
+            'SLAB, waits known (reference)': 'PerfInfo'}
+STOCH_TITLES = {'Repair': 'Rival: SLAB, repair',
+                'Spt': 'Rival: SPT, re-plan',
+                'CpRepair': 'Rival: CP-SAT, repair',
+                'CpRoll': 'Rival: CP-SAT, rolling (10 modules only)',
+                'PerfInfo': 'Reference: SLAB, waits known'}
+
+
+def s2_uncertain(out_dir):
+    head = ['Modules & cv & Pairs & ' + S2_TEST_HEAD]
+    x3 = x3_rows('table_VIII_uncertain_waits', lambda s: 'stochastic_lags_' in s)
+    x3_by = ({(X3_STOCH[r['rival']], r['size'], round(float(r['cv']), 3)): r
+              for r in x3} if x3 else {})
+    rows = []
+    for R, method, _w in M.STOCH_RIVALS:
+        rows.append(('BLOCK', STOCH_TITLES[R]))
+        for S in ('Ten', 'Fifty'):
+            if R not in [x[0] for x in M.stoch_rivals(S)]:
+                continue
+            src(M.stoch_rel(S, 'slab_reactive'))
+            src(M.stoch_rel(S, method))
+            for k, (cvn, cv) in enumerate(M.CVS):
+                tfn = (lambda s=S, m=method, c=cv: M.stoch_test(s, m, c))
+                hfn = (lambda s=S, m=method, i=k: M.stoch_holm(s, m)[i])
+                n = num(lambda f=tfn: f()['n'], 'int', f'Stoch{R}{S}')
+                cells = test_cells(f'Stoch{R}', f'{S}{cvn}', tfn,
+                                   f'PvalStoch{R}Holm{S}{cvn}', hfn)
+                rows.append([str(SIZE_NUM[S]), dec(cv, 1), n] + cells)
+                if x3 is not None and not cells[0].pending:
+                    row = x3_by.get((R, S, cv))
+                    check(row is not None, f'{X3_JSON}: no Table VIII row {R} {S} {cv}')
+                    x3_check(row, tfn(), hfn(), f'Table VIII {R} {S} cv {cv}')
+    return write_table(out_dir, 's2_uncertain.tex', '@{}rcrccccc@{}', head,
+                       rows, 8)
+
+
+X3_DIS = {'LLF': 'Llf', 'SPT': 'SptRule', 'SPTL': 'Spt', 'GA 5 s': 'Ga',
+          'Right-shift': 'Rs',
+          'Residual CP-SAT 5 s': 'ResFive', 'Residual CP-SAT 30 s': 'ResThirty'}
+DIS_TITLES = {'Llf': 'Rival: LLF re-planning', 'SptRule': 'Rival: SPT re-planning',
+              'Spt': 'Rival: SPTL re-planning', 'Ga': 'Rival: GA, 5\\,s',
+              'Rs': 'Rival: right-shift',
+              'ResFive': 'Rival: residual CP-SAT, 5\\,s',
+              'ResThirty': 'Rival: residual CP-SAT, 30\\,s'}
+
+
+def s2_disrupt(out_dir):
+    """Paired tests of Table IX, one table body per size (s2_disrupt10.tex,
+    s2_disrupt50.tex); not written when PAPER_DISRUPT_STATS=0. Every rival is
+    paired with the SLAB column of Table IX: the rule and residual CP-SAT
+    files are asserted (make_paper_macros) to start from the same disrupted
+    states with the same SLAB re-plans."""
+    if not M.DISRUPT_STATS:
+        return []
+    check('PvalDisLlfLagTen' in MAC, 'macros_results.json has no Table IX tests: '
+          'run make_paper_macros.py with the same PAPER_DISRUPT_STATS setting')
+    head = ['Disruption & ' + S2_TEST_HEAD]
+    x3 = x3_rows('table_IX_disruptions',
+                 lambda s: 'reactive_' in s or 'residual_cpsat_' in s)
+    x3_by = ({(X3_DIS[r['rival']], r['size'], r['type']): r
+              for r in x3['makespan']} if x3 else {})
+    files = []
+    for S, ds, _n in M.DIS_SIZES:
+        rows = []
+        for R, key, where, _w in M.DIS_RIVALS:
+            rows.append(('BLOCK', DIS_TITLES[R]))
+            for k, (T, t) in enumerate(M.DIS_TYPES):
+                src(M.dis_rel(ds, t))
+                if where == 'rules':
+                    src(M.rules_rel(ds, t))
+                elif where == 'resid':
+                    src(M.resid_rel(ds, t))
+                tfn = (lambda s=S, r=R, t=t: M.dis_test(s, r, t))
+                hfn = (lambda s=S, r=R, i=k: M.dis_holm(s, r)[i])
+                cells = test_cells(f'Dis{R}', f'{T}{S}', tfn,
+                                   f'PvalDis{R}Holm{T}{S}', hfn)
+                rows.append([DIS_LABELS[T]] + cells)
+                if x3 is not None and not cells[0].pending:
+                    row = x3_by.get((R, S, t))
+                    check(row is not None, f'{X3_JSON}: no Table IX row {R} {S} {t}')
+                    x3_check(row, tfn(), hfn(), f'Table IX {R} {S} {t}')
+        files.append(write_table(out_dir, f's2_disrupt{SIZE_NUM[S]}.tex',
+                                 '@{}lccccc@{}', head, rows, 6))
+    return files
+
+
+# ---- S8 rule re-planners, breakdown severity, stability at 50 modules ------------
+RULE_COLS = (('Slab', 'drl_reactive'), ('Spt', 'spt_reactive'),
+             ('SptRule', 'rule_spt_reactive'), ('Llf', 'rule_llf_reactive'))
+
+
+def s8_rules(out_dir):
+    """SLAB against the rule re-planners in the closed loop. Bold: the
+    smallest value in each row among SLAB, SPTL, SPT and LLF."""
+    head = [' & \\multicolumn{4}{c}{Mean makespan (h)} & '
+            '\\multicolumn{3}{c}{SLAB shorter/equal/longer than} \\\\',
+            '\\cmidrule(lr){2-5}\\cmidrule(l){6-8}',
+            'Disruption & SLAB & SPTL & SPT & LLF & SPTL & SPT & LLF \\\\']
+    rows = []
+    for S, ds, n in M.DIS_SIZES:
+        rows.append(('BLOCK', f'{SIZE_NUM[S]} modules, {n} orders'))
+        for T, t in M.DIS_TYPES:
+            src(M.dis_rel(ds, t))
+            src(M.rules_rel(ds, t))
+            cells = []
+            for code, key in RULE_COLS:
+                if code in ('Slab', 'Spt'):
+                    fn = (lambda k=key: M.dis_value(ds, n, t, k, 'makespan'))
+                else:
+                    fn = (lambda k=key: M.rules_mean(ds, n, t, k))
+                cells.append(mac(f'Dis{T}{code}{S}', fn, 'h'))
+            bold_best(cells)
+            try:
+                rec = M.rules_file(ds, t, n)['records']
+                counts = [wtl_tol(rec['drl_reactive']['makespan'], rec[key]['makespan'])
+                          for _c, key in RULE_COLS[1:]]
+            except Missing as err:
+                counts = [pend(f'Rules{S}', str(err)).text] * 3
+            rows.append([DIS_LABELS[T]] + cells + counts)
+        for label, stem, kind, field in (('Changes', 'DisNerv', 'h', 'comb_nerv'),
+                                         ('Time (s)', 'DisTime', 's', 'seconds')):
+            cells = []
+            for code, key in RULE_COLS:
+                if code in ('Slab', 'Spt'):
+                    fn = (lambda k=key, f=field: float(np.mean(
+                        [M.dis_value(ds, n, t, k, f) for _T, t in M.DIS_TYPES])))
+                else:
+                    fn = (lambda k=key, f=field: float(np.mean(
+                        [M.rules_mean(ds, n, t, k, f) for _T, t in M.DIS_TYPES])))
+                cells.append(mac(f'{stem}{code}{S}', fn, kind))
+            bold_best(cells)
+            rows.append([label] + cells + [DASH] * 3)
+    return write_table(out_dir, 's8_rules.tex', '@{}lccccccc@{}', head, rows, 8)
+
+
+def wtl_tol(a, b):
+    """Shorter/equal/longer counts with makespans closer than M.TIE_TOL
+    counted as equal."""
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    check(a.shape == b.shape, f'pairing shapes {a.shape} {b.shape}')
+    sh, lo = M.count_shorter(a, b), M.count_shorter(b, a)
+    return '%d/%d/%d' % (sh, a.size - sh - lo, lo)
+
+
+def outage_hours(ds, n):
+    """Outage of the Table IX breakdown on every order, from the info strings
+    of the reactive file (0.5 x mean processing time of the order)."""
+    d = M.reactive(ds, 'breakdown', n)
+    hrs = []
+    for x in d['info']:
+        m = re.search(r'down ([0-9.]+)h', x)
+        check(m is not None, f'{M.dis_rel(ds, "breakdown")}: info {x}')
+        hrs.append(float(m.group(1)))
+    check(len(hrs) == n, 'outage count')
+    return np.array(hrs)
+
+
+def s8_severity(out_dir):
+    """Breakdown severity. Bold: the smallest value in each row across all
+    methods (as Table IX of the paper)."""
+    head = [' & & & & & & & \\multicolumn{2}{c}{Residual CP-SAT} \\\\',
+            '\\cmidrule(l){8-9}',
+            ' & SLAB & SPTL & SPT & LLF & GA, 5\\,s & Shift & 5\\,s & 30\\,s \\\\']
+    labels = {'Base': 'outage $0.5\\times$ mean processing time',
+              'Eight': 'outage 8\\,h', 'TwentyFour': 'outage 24\\,h'}
+    rows = []
+    for S, ds, n in M.DIS_SIZES:
+        try:
+            hrs = outage_hours(ds, n)
+            supp(f'SuBrkOutage{S}', dec(hrs.mean(), 1), M.dis_rel(ds, 'breakdown'),
+                 'mean outage of the Table IX breakdown, 0.5 x mean processing time (h)')
+        except Missing as err:
+            supp_pend(f'SuBrkOutage{S}', M.dis_rel(ds, 'breakdown'), str(err))
+        for sev in ('Base', 'Eight', 'TwentyFour'):
+            rows.append(('BLOCK', f'{SIZE_NUM[S]} modules, {n} orders, {labels[sev]}'))
+            for code, _k, _w in M.SEV_ARMS:
+                src(M.sev_src(S, sev, code))
+            ms, nv = ['Makespan (h)'], ['Changes']
+            for code, _k, _w in M.SEV_ARMS:
+                name = f'DisBrk{code}{S}' if sev == 'Base' else f'Sev{code}{sev}{S}'
+                ms.append(mac(name, lambda c=code, v=sev: M.sev_mean(S, v, c), 'h'))
+                nv.append(mac(f'SevNerv{code}{sev}{S}',
+                              lambda c=code, v=sev: M.sev_mean(S, v, c, 'comb_nerv'), 'h'))
+            bold_best(ms[1:])
+            bold_best(nv[1:])
+            rows += [ms, nv]
+    return write_table(out_dir, 's8_severity.tex', '@{}lcccccccc@{}', head, rows, 9)
+
+
+def s8_stability50(out_dir):
+    """Stability-aware residual CP-SAT at 50 modules, in the format of
+    s8_stability.tex (no bold)."""
+    head = ['Re-planner & $w$ (h) & \\makecell{Makespan\\\\increase (\\%)} & '
+            '\\makecell{Changed\\\\operations} & \\makecell{Station\\\\changes} & '
+            '\\makecell{Start\\\\moves} & \\makecell{Mean\\\\time (s)} & '
+            '\\makecell{Max.\\\\time (s)} & \\makecell{Proven\\\\optimal} \\\\']
+    rows = []
+    for T, dtype, title in (('Lag', 'lag_perturb', 'One wait doubled'),
+                            ('Brk', 'breakdown', 'Station breakdown')):
+        rows.append(('BLOCK', title))
+        src(M.stab50_rel(dtype))
+        try:
+            d = M.stab50(dtype)
+        except Missing as err:
+            rows.append(['SLAB'] + [pend('StabFifty', str(err)).text] * 8)
+            continue
+        n, dr = int(d['n']), d['drl']
+        rows.append(['SLAB re-planning', DASH,
+                     mac(f'SlabInfl{T}Fifty', lambda: np.mean(dr['infl']), 'pct'),
+                     mac(f'SlabNerv{T}Fifty', lambda: np.mean(dr['nerv']), 'h'),
+                     dec(np.mean(dr['mch_nerv']), 1), dec(np.mean(dr['time_nerv']), 1),
+                     fmt('s', np.mean(dr['sec'])), fmt('s', np.max(dr['sec'])), DASH])
+        for w in d['weights']:
+            fr = d['frontier'][w]
+            if float(w) == 0.5:
+                infl = mac(f'StabInfl{T}Fifty', lambda f=fr: np.mean(f['infl']), 'pct')
+                nerv = mac(f'StabNerv{T}Fifty', lambda f=fr: np.mean(f['nerv']), 'h')
+            else:
+                infl = num(lambda f=fr: np.mean(f['infl']), 'pct', 'x')
+                nerv = num(lambda f=fr: np.mean(f['nerv']), 'h', 'x')
+            rows.append(['Residual CP-SAT', dec(float(w), 1), infl, nerv,
+                         dec(np.mean(fr['mch_nerv']), 1),
+                         dec(np.mean(fr['time_nerv']), 1),
+                         fmt('s', np.mean(fr['sec'])), fmt('s', np.max(fr['sec'])),
+                         f'{int(fr["optimal"])}/{n}'])
+        mac(f'StabMatch{T}Fifty', lambda: sum(
+            1 for w in d['weights'] if np.mean(d['frontier'][w]['infl'])
+            <= np.mean(dr['infl'])), 'int')
+    try:
+        d = M.stab50('lag_perturb')
+        s_ = M.stab50_rel('<type>')
+        supp('SuStabFiftyN', str(int(d['n'])), s_, 'disrupted orders per type')
+        supp('SuStabFiftyBudget', str(int(d['budget'])), s_, 'CP-SAT time limit (s)')
+        supp('SuStabFiftyWMax', dec(float(d['weights'][-1]), 0), s_, 'largest weight (h)')
+    except Missing as err:
+        for k in ('SuStabFiftyN', 'SuStabFiftyBudget', 'SuStabFiftyWMax'):
+            supp_pend(k, M.stab50_rel('<type>'), str(err))
+    return write_table(out_dir, 's8_stability50.tex', '@{}lrccccccc@{}', head,
+                       rows, 9)
+
+
+def s1_workers(out_dir):
+    """CP-SAT from SPT, 600 s, with 4 and with 16 workers on the first 20
+    orders of 80 modules, against SLAB on the same orders. Bold: the
+    shortest mean. The 16-worker cells print \\pend until its file holds 20
+    records."""
+    head = ['Method & Mean (h) & \\makecell{SLAB shorter/equal/\\\\longer} & '
+            '\\makecell{Min. CPU-time\\\\ratio} \\\\']
+    ds, n, T = M.CP16_DS, M.CP16_N, M.CP16_T
+    slab = M.inst_of(M.HSTAR, ds)[:n]
+    src(M.src(M.HSTAR, ds))
+    rows, means = [], []
+    for label, name, fn, f in (
+            ('CP-SAT from SPT, 4 workers, 600\\,s', 'CpFourSameEighty',
+             lambda: [float(x) for x in M.cp_col(ds, 'Eighty', 'warm-spt')[:n]],
+             M.cp_src(ds, 'Eighty', 'warm-spt')),
+            ('CP-SAT from SPT, 16 workers, 600\\,s', 'CpSixteenEighty',
+             lambda: [float(r['objective']) for r in M.cp16_recs()],
+             M.any_rel(ds, 'warm-spt', T, 16))):
+        src(f)
+        c = mac(name, lambda fn=fn: float(np.mean(fn())), 'h')
+        try:
+            v = np.asarray(fn(), dtype=float)
+            recs = (M.cp16_recs() if name == 'CpSixteenEighty'
+                    else M.anytime(ds, 'warm-spt', T, 'warm-spt')[:n])
+            share = math.floor(100 * min(float(r['cpu_share']) for r in recs)) / 100
+            cnt = wtl_tol(slab, v)
+            sh = dec(share, 2)
+            if name == 'CpSixteenEighty':
+                mac('CpSixteenMinShareEighty', lambda s_=share: s_, 'share')
+                mac('CpSixteenWinsEighty', lambda v=v: M.count_shorter(slab, v), 'int')
+        except Missing as err:
+            cnt = sh = pend('CpSixteen', str(err)).text
+        rows.append([label, c, cnt, sh])
+        means.append(c)
+    c = mac('LongSlabEighty', lambda: float(np.mean(slab)), 'h')
+    rows.append(['SLAB, mean of three seeds', c, DASH, DASH])
+    means.append(c)
+    bold_best(means)
+    return write_table(out_dir, 's1_workers.tex', '@{}lccc@{}', head, rows, 4)
+
+
+def s1_shellsearch(out_dir):
+    """Single-shell orders at 50 modules, first 20 orders: SPT, the memetic
+    algorithm (local search on every child, 300 s), CP-SAT from SPT (600 s,
+    four workers) and SLAB. Bold: the shortest mean in each column. Cells of
+    unfinished runs print \\pend."""
+    head = ['Method & RC shells & Steel shells \\\\']
+    labels = (('SPT rule', 'ShellSptTwenty'),
+              ('Memetic, local search on every child, 300\\,s', 'ShellMa'),
+              ('CP-SAT from SPT, 600\\,s, four workers', 'ShellCp'),
+              ('SLAB, mean of three seeds', 'ShellSlabTwenty'))
+    n = M.SHELL_SEARCH_N
+    fns = {'ShellSptTwenty': lambda d: float(np.mean(M.shell(d, 'SPT')[:n])),
+           'ShellMa': lambda d: M.shell_ma_col(d).mean(),
+           'ShellCp': lambda d: M.shell_cp_col(d).mean(),
+           'ShellSlabTwenty': lambda d: float(np.mean(M.shell_slab(d)[:n]))}
+    cols = []
+    for K, ds in M.SHELL50:
+        src(M.shell_rel(ds, 'SPT'))
+        src(M.shell_rel(ds, M.SHELL_SEED_PAT))
+        src(M.ma_rel(ds))
+        src(M.shell_cp_rel(ds))
+        col = [mac(f'{stem}{K}Fifty', lambda d=ds, f=fns[stem]: f(d), 'h')
+               for _l, stem in labels]
+        bold_best(col)
+        cols.append(col)
+    rows = [[lab] + [c[i] for c in cols] for i, (lab, _s) in enumerate(labels)]
+    return write_table(out_dir, 's1_shellsearch.tex', '@{}lcc@{}', head, rows, 3)
+
+
+def revision_tables(out_dir):
+    out = [s4_tightness(out_dir), s1_shell(out_dir), s1_reach(out_dir),
+           s2_train(out_dir), s2_uncertain(out_dir)]
+    f = s2_disrupt(out_dir)
+    if f:
+        out += f
+    else:
+        print('s2_disrupt10.tex and s2_disrupt50.tex not written '
+              '(PAPER_DISRUPT_STATS=0)')
+    out += [s8_rules(out_dir), s8_severity(out_dir), s8_stability50(out_dir),
+            s1_workers(out_dir), s1_shellsearch(out_dir)]
+    return out
+
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--strict', action='store_true',
@@ -2032,6 +2753,7 @@ def main(argv=None):
         out.append(f)
         metaheuristic_constants()
         hardware(aff)
+        out += revision_tables(args.out_dir)
         out.append(write_supp_macros(args.out_dir))
         bbl = make_bbl(args.out_dir)
         if bbl:

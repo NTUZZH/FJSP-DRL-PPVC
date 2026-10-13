@@ -78,7 +78,10 @@ def test_full_run_writes_every_table(tmp_path):
         's4_bound.tex', 's4_aids.tex', 's5_byproducts.tex', 's6_flowline.tex',
         's7_sensitivity.tex', 's8_stability.tex', 's10_routes.tex',
         's10_stations.tex', 's11_hyper.tex', 's11_protocols.tex',
-        'supp_macros.tex'}
+        's4_tightness.tex', 's1_shell.tex', 's1_reach.tex', 's2_train.tex',
+        's2_uncertain.tex', 's2_disrupt10.tex', 's2_disrupt50.tex',
+        's8_rules.tex', 's8_severity.tex', 's8_stability50.tex',
+        's1_workers.tex', 's1_shellsearch.tex', 'supp_macros.tex'}
     assert want <= files
     for name in want - {'supp_macros.tex'}:
         txt = (tmp_path / name).read_text()
@@ -89,14 +92,15 @@ def test_full_run_writes_every_table(tmp_path):
         for line in body:
             if line.endswith(r'\\') and '&' in line:
                 n = len(re.findall(r'(?<!\\)&', line)) + 1
-                assert n in (2, 3, 4, 5, 6, 7, 9), (name, line)
+                assert n in (2, 3, 4, 5, 6, 7, 8, 9), (name, line)
     macros = (tmp_path / 'supp_macros.tex').read_text()
     names = re.findall(r'\\newcommand\{\\(Su[A-Za-z]+)\}', macros)
     assert len(names) == len(set(names)) > 40
     # the S9 chart is one network under two executions: its numbers are the
     # two makespans and the penalties, and the macros of the former chart of
     # two different policies are gone
-    for k in ('SuGanttDispatch', 'SuGanttRepair', 'SuGanttPenalty',
+    for k in ('SuTightStates', 'SuTightViolations',
+              'SuGanttDispatch', 'SuGanttRepair', 'SuGanttPenalty',
               'SuGanttPenaltyMedian', 'SuGanttN', 'SuCurveSettleAug',
               'SuCurveSettleFree', 'SuCurveSpreadAug', 'SuCurveSpreadFree',
               'SuMixEighty', 'SuSingleEighty'):

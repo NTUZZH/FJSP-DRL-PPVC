@@ -1,0 +1,194 @@
+{
+ "method": "memetic (Caumond, Lacomme, Tchernev 2008), flexible-shop adaptation",
+ "dataset": "50x25+ppvc-rc_project",
+ "route_variant": "fixed",
+ "n_instances": 1,
+ "budget_s": 300.0,
+ "budget_includes_seeding": false,
+ "max_gens": 1000000,
+ "seed": 0,
+ "seed_test": 50,
+ "params": {
+  "nc": 50,
+  "n1": 14,
+  "np": 20000,
+  "pm": 1.0,
+  "mni": 1000000,
+  "nm": 10,
+  "pr": 0.5,
+  "mark_K": 49999,
+  "rules": [
+   "FIFO",
+   "MOR",
+   "SPT",
+   "MWKR",
+   "SPTL",
+   "LLF",
+   "MWKRL",
+   "LRPTL"
+  ]
+ },
+ "fast_eval": true,
+ "numba": "0.68.0",
+ "instance_range": [
+  9,
+  10
+ ],
+ "instances": [
+  {
+   "instance": "instance_009",
+   "best_makespan": 454.0,
+   "best_seed_makespan": 454.0,
+   "spt_makespan": 454.0,
+   "generations": 75522,
+   "ls_calls": 75522,
+   "ls_improvements": 113285,
+   "restarts": 3,
+   "clones_rejected": 41750,
+   "iter_to_best": 0,
+   "time_to_best_s": 43.835,
+   "seed_s": 43.791,
+   "search_s": 300.0,
+   "total_s": 343.791,
+   "s_per_generation": 0.003972353371033012,
+   "n_seeds": 14,
+   "validator_violations": 0,
+   "seeds": [
+    {
+     "rule": "FIFO",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 755.0,
+     "decoded_makespan": 755.0
+    },
+    {
+     "rule": "MOR",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 938.0,
+     "decoded_makespan": 938.0
+    },
+    {
+     "rule": "SPT",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 454.0,
+     "decoded_makespan": 454.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 677.0,
+     "decoded_makespan": 677.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 476.0,
+     "decoded_makespan": 476.0
+    },
+    {
+     "rule": "LLF",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 455.0,
+     "decoded_makespan": 455.0
+    },
+    {
+     "rule": "MWKRL",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 677.0,
+     "decoded_makespan": 677.0
+    },
+    {
+     "rule": "LRPTL",
+     "round": 0,
+     "tie_seed": 59,
+     "env_makespan": 672.0,
+     "decoded_makespan": 672.0
+    },
+    {
+     "rule": "FIFO",
+     "round": 1,
+     "tie_seed": 7928,
+     "env_makespan": 754.0,
+     "decoded_makespan": 754.0
+    },
+    {
+     "rule": "MOR",
+     "round": 1,
+     "tie_seed": 7928,
+     "env_makespan": 939.0,
+     "decoded_makespan": 939.0
+    },
+    {
+     "rule": "SPT",
+     "round": 1,
+     "tie_seed": 7928,
+     "env_makespan": 457.0,
+     "decoded_makespan": 457.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 1,
+     "tie_seed": 7928,
+     "env_makespan": 673.0,
+     "decoded_makespan": 673.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 1,
+     "tie_seed": 7928,
+     "env_makespan": 473.0,
+     "decoded_makespan": 473.0
+    },
+    {
+     "rule": "LLF",
+     "round": 1,
+     "tie_seed": 7928,
+     "env_makespan": 457.0,
+     "decoded_makespan": 457.0
+    }
+   ],
+   "improvement_trace": [
+    [
+     0,
+     43.835,
+     454.0
+    ]
+   ],
+   "solve_wall_s": 300.0002,
+   "solve_cpu_s": 299.9999,
+   "workers": 1,
+   "cpu_share": 1.0,
+   "status": "budget",
+   "time_limit_s": 300.0,
+   "hit_limit": true,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    17
+   ],
+   "loadavg_start": [
+    23.12,
+    29.3,
+    29.98
+   ]
+  }
+ ],
+ "contention": {
+  "n_records": 1,
+  "n_records_without_fields": 0,
+  "n_timed_solves": 1,
+  "n_hit_limit": 1,
+  "n_low_share": 0,
+  "n_no_evidence": 0,
+  "cpu_share_min": 1.0
+ }
+}

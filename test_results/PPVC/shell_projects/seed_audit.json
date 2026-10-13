@@ -1,0 +1,478 @@
+{
+ "script": "eval_shell_projects.py --stage audit",
+ "sets_on_disk": [
+  {
+   "set": "data/PPVC/10x15+ppvc-mixed",
+   "kind": "test",
+   "seed0": 60000,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/PPVC/10x25+ppvc-mixed",
+   "kind": "test",
+   "seed0": 50000,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/PPVC/10x25+ppvc-mixed-ind",
+   "kind": "test",
+   "seed0": 720000,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/PPVC/10x25+ppvc-mixed-lagx1.5",
+   "kind": "test",
+   "seed0": 50000,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/PPVC/10x25+ppvc-mixed-var",
+   "kind": "test",
+   "seed0": 120000,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/PPVC/10x25+ppvc-rc_project",
+   "kind": "test",
+   "seed0": 90000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/10x25+ppvc-steel_project",
+   "kind": "test",
+   "seed0": 95000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/20x25+ppvc-mixed",
+   "kind": "test",
+   "seed0": 80000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/20x25+ppvc-mixed-ind",
+   "kind": "test",
+   "seed0": 730000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/20x25+ppvc-mixed-var",
+   "kind": "test",
+   "seed0": 130000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/30x25+ppvc-mixed",
+   "kind": "test",
+   "seed0": 90000,
+   "n": 20,
+   "n_files": 20
+  },
+  {
+   "set": "data/PPVC/40x25+ppvc-mixed",
+   "kind": "test",
+   "seed0": 86000,
+   "n": 20,
+   "seed0_identified": 86000,
+   "identified_orders_0_and_1": true
+  },
+  {
+   "set": "data/PPVC/50x25+ppvc-mixed",
+   "kind": "test",
+   "seed0": 100000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/50x25+ppvc-mixed-ind",
+   "kind": "test",
+   "seed0": 700000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/50x25+ppvc-mixed-lagx1.5",
+   "kind": "test",
+   "seed0": 100000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/50x25+ppvc-mixed-var",
+   "kind": "test",
+   "seed0": 140000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/5x9+ppvc-mixed",
+   "kind": "test",
+   "seed0": 70000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/80x25+ppvc-mixed",
+   "kind": "test",
+   "seed0": 110000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/80x25+ppvc-mixed-ind",
+   "kind": "test",
+   "seed0": 710000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/PPVC/80x25+ppvc-mixed-var",
+   "kind": "test",
+   "seed0": 150000,
+   "n": 50,
+   "n_files": 50
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x15+ppvc-mixed",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 4,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x15+ppvc-mixed-lagx0.5",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x25+ppvc-mixed",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x25+ppvc-mixed-lagx0.25",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x25+ppvc-mixed-lagx0.5",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x25+ppvc-mixed-lagx0.75",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x25+ppvc-mixed-lagx1.5",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/10x25+ppvc-mixed-var",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x15+ppvc-mixed",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x15+ppvc-mixed-lagx0.5",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x25+ppvc-mixed",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x25+ppvc-mixed-lagx0.25",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x25+ppvc-mixed-lagx0.5",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x25+ppvc-mixed-lagx0.75",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x25+ppvc-mixed-lagx1.5",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  },
+  {
+   "set": "data/data_train_vali/PPVC/20x25+ppvc-mixed-var",
+   "kind": "validation",
+   "seed0": 100,
+   "n": 100,
+   "n_files": 100
+  }
+ ],
+ "slab_training_configs": {
+  "301": {
+   "seed_train": 301,
+   "num_envs": 20,
+   "reset_env_timestep": 20,
+   "max_updates": 2000,
+   "ppvc_route_variant": "fixed",
+   "ppvc_mix": "mixed",
+   "ppvc_factory": "default",
+   "lag_scale": 0.5,
+   "seed_train_vali_datagen": 100,
+   "vali_size": 100,
+   "ppvc_vali_sizes": "10,20",
+   "ppvc_lag_cv": 0.0,
+   "size_mix": null,
+   "init_from": ""
+  },
+  "302": {
+   "seed_train": 302,
+   "num_envs": 20,
+   "reset_env_timestep": 20,
+   "max_updates": 2000,
+   "ppvc_route_variant": "fixed",
+   "ppvc_mix": "mixed",
+   "ppvc_factory": "default",
+   "lag_scale": 0.5,
+   "seed_train_vali_datagen": 100,
+   "vali_size": 100,
+   "ppvc_vali_sizes": "10,20",
+   "ppvc_lag_cv": 0.0,
+   "size_mix": null,
+   "init_from": ""
+  },
+  "303": {
+   "seed_train": 303,
+   "num_envs": 20,
+   "reset_env_timestep": 20,
+   "max_updates": 2000,
+   "ppvc_route_variant": "fixed",
+   "ppvc_mix": "mixed",
+   "ppvc_factory": "default",
+   "lag_scale": 0.5,
+   "seed_train_vali_datagen": 100,
+   "vali_size": 100,
+   "ppvc_vali_sizes": "10,20",
+   "ppvc_lag_cv": 0.0,
+   "size_mix": null,
+   "init_from": ""
+  }
+ },
+ "training_seed_stream": "train.py: setup_seed(seed_train) at the start of train(); one np.random.randint(0, 2**31-1) per training order; 20 orders every 20 updates over 2000 updates = 2000 draws per seed",
+ "training_draws_range": {
+  "301": [
+   205204,
+   2145317308
+  ],
+  "302": [
+   947501,
+   2146458754
+  ],
+  "303": [
+   416849,
+   2145805614
+  ]
+ },
+ "n_training_draws": {
+  "301": 2000,
+  "302": 2000,
+  "303": 2000
+ },
+ "validation_seeds": "100-199 at 10 and 20 modules (seed_train_vali_datagen=100, vali_size=100)",
+ "single_shell": {
+  "10x25+ppvc-rc_project": {
+   "seed0": 90000,
+   "n": 50,
+   "seed_range": [
+    90000,
+    90049
+   ],
+   "n_modules": 10,
+   "mix": "rc_project",
+   "status": "existing",
+   "overlaps_with_sets": [
+    {
+     "with": "data/PPVC/30x25+ppvc-mixed",
+     "kind": "test",
+     "range": [
+      90000,
+      90019
+     ],
+     "n_shared_seeds": 20
+    }
+   ],
+   "training_draws_in_range": {
+    "301": [],
+    "302": [],
+    "303": []
+   },
+   "training_draws_min_distance": {
+    "301": 115155,
+    "302": 857452,
+    "303": 326800
+   },
+   "orders_not_regenerated_from_recorded_seed": []
+  },
+  "10x25+ppvc-steel_project": {
+   "seed0": 95000,
+   "n": 50,
+   "seed_range": [
+    95000,
+    95049
+   ],
+   "n_modules": 10,
+   "mix": "steel_project",
+   "status": "existing",
+   "overlaps_with_sets": [],
+   "training_draws_in_range": {
+    "301": [],
+    "302": [],
+    "303": []
+   },
+   "training_draws_min_distance": {
+    "301": 110155,
+    "302": 852452,
+    "303": 321800
+   },
+   "orders_not_regenerated_from_recorded_seed": []
+  },
+  "10x25+ppvc-rc_project-ind": {
+   "seed0": 740000,
+   "n": 50,
+   "seed_range": [
+    740000,
+    740049
+   ],
+   "n_modules": 10,
+   "mix": "rc_project",
+   "status": "new",
+   "overlaps_with_sets": [],
+   "training_draws_in_range": {
+    "301": [],
+    "302": [],
+    "303": []
+   },
+   "training_draws_min_distance": {
+    "301": 171330,
+    "302": 207452,
+    "303": 323151
+   }
+  },
+  "10x25+ppvc-steel_project-ind": {
+   "seed0": 750000,
+   "n": 50,
+   "seed_range": [
+    750000,
+    750049
+   ],
+   "n_modules": 10,
+   "mix": "steel_project",
+   "status": "new",
+   "overlaps_with_sets": [],
+   "training_draws_in_range": {
+    "301": [],
+    "302": [],
+    "303": []
+   },
+   "training_draws_min_distance": {
+    "301": 161330,
+    "302": 197452,
+    "303": 333151
+   }
+  },
+  "50x25+ppvc-rc_project": {
+   "seed0": 760000,
+   "n": 50,
+   "seed_range": [
+    760000,
+    760049
+   ],
+   "n_modules": 50,
+   "mix": "rc_project",
+   "status": "new",
+   "overlaps_with_sets": [],
+   "training_draws_in_range": {
+    "301": [],
+    "302": [],
+    "303": []
+   },
+   "training_draws_min_distance": {
+    "301": 151330,
+    "302": 187452,
+    "303": 343151
+   }
+  },
+  "50x25+ppvc-steel_project": {
+   "seed0": 770000,
+   "n": 50,
+   "seed_range": [
+    770000,
+    770049
+   ],
+   "n_modules": 50,
+   "mix": "steel_project",
+   "status": "new",
+   "overlaps_with_sets": [],
+   "training_draws_in_range": {
+    "301": [],
+    "302": [],
+    "303": []
+   },
+   "training_draws_min_distance": {
+    "301": 141330,
+    "302": 177452,
+    "303": 353151
+   }
+  }
+ },
+ "notes": [
+  "data/PPVC/40x25+ppvc-mixed: no dataset_meta.json; seed0 identified by regeneration = 86000 (orders 0 and 1 match: True)"
+ ]
+}

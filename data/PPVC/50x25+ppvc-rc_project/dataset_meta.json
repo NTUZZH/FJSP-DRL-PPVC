@@ -1,0 +1,8 @@
+{
+ "seed0": 760000,
+ "n_instances": 50,
+ "n_modules": 50,
+ "ppvc_mix": "rc_project",
+ "ppvc_factory": "default",
+ "purpose": "single-shell project test set at 50 modules (eval-only), seeds disjoint from all other sets"
+}

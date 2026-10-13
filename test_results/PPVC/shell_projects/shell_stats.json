@@ -1,0 +1,1038 @@
+{
+ "script": "eval_shell_projects.py --stage stats",
+ "conventions": "mean paired difference SLAB minus rival with 95% percentile bootstrap CI (2000 resamples, default_rng(0)); two-sided Wilcoxon signed-rank, zero differences dropped; matched-pairs rank-biserial r, r < 0 = SLAB shorter; SLAB seed mean = per-order mean of seeds 301-303, all on the CPU",
+ "sets": {
+  "10x25+ppvc-rc_project-ind": {
+   "seed0": 740000,
+   "n_orders": 50,
+   "n_modules": 10,
+   "mix": "rc_project",
+   "mean_makespan": {
+    "SLAB s301": 229.6,
+    "SLAB s302": 231.7,
+    "SLAB s303": 230.36,
+    "SLAB seed mean": 230.5533333333333,
+    "SLAB seed std (population, of the seed means)": 0.8681525723563123,
+    "FIFO": 258.44,
+    "MOR": 263.46,
+    "SPT": 237.6,
+    "MWKR": 249.96,
+    "SPTL": 237.82,
+    "LLF": 237.36,
+    "MWKRL": 241.48,
+    "LRPTL": 240.3
+   },
+   "comparisons": {
+    "seed mean vs SPT": {
+     "mean_a": 230.5533333333333,
+     "mean_b": 237.6,
+     "mean_diff": -7.046666666666665,
+     "ci95": [
+      -9.200333333333331,
+      -5.166499999999999
+     ],
+     "pct_diff": -2.965768799102142,
+     "shorter": 41,
+     "equal": 0,
+     "longer": 9,
+     "p_wilcoxon": 2.8690276958645347e-07,
+     "r_rank_biserial": -0.8337254901960784
+    },
+    "seed mean vs LLF": {
+     "mean_a": 230.5533333333333,
+     "mean_b": 237.36,
+     "mean_diff": -6.806666666666665,
+     "ci95": [
+      -8.953666666666665,
+      -4.8599999999999985
+     ],
+     "pct_diff": -2.867655319627027,
+     "shorter": 39,
+     "equal": 0,
+     "longer": 11,
+     "p_wilcoxon": 7.846460076525363e-07,
+     "r_rank_biserial": -0.8023529411764706
+    },
+    "s301 vs SPT": {
+     "mean_a": 229.6,
+     "mean_b": 237.6,
+     "mean_diff": -8.0,
+     "ci95": [
+      -10.100499999999998,
+      -5.96
+     ],
+     "pct_diff": -3.367003367003363,
+     "shorter": 44,
+     "equal": 1,
+     "longer": 5,
+     "p_wilcoxon": 6.684668786428484e-08,
+     "r_rank_biserial": -0.8857142857142857
+    },
+    "s301 vs LLF": {
+     "mean_a": 229.6,
+     "mean_b": 237.36,
+     "mean_diff": -7.76,
+     "ci95": [
+      -9.9005,
+      -5.64
+     ],
+     "pct_diff": -3.2692955847657634,
+     "shorter": 42,
+     "equal": 2,
+     "longer": 6,
+     "p_wilcoxon": 1.4467420499498455e-07,
+     "r_rank_biserial": -0.8715986394557823
+    },
+    "s302 vs SPT": {
+     "mean_a": 231.7,
+     "mean_b": 237.6,
+     "mean_diff": -5.9,
+     "ci95": [
+      -8.160499999999999,
+      -3.899500000000003
+     ],
+     "pct_diff": -2.483164983164987,
+     "shorter": 36,
+     "equal": 5,
+     "longer": 9,
+     "p_wilcoxon": 2.336370632361849e-05,
+     "r_rank_biserial": -0.7236714975845411
+    },
+    "s302 vs LLF": {
+     "mean_a": 231.7,
+     "mean_b": 237.36,
+     "mean_diff": -5.66,
+     "ci95": [
+      -7.98,
+      -3.58
+     ],
+     "pct_diff": -2.3845635321874004,
+     "shorter": 35,
+     "equal": 3,
+     "longer": 12,
+     "p_wilcoxon": 5.4301549110015725e-05,
+     "r_rank_biserial": -0.675531914893617
+    },
+    "s303 vs SPT": {
+     "mean_a": 230.36,
+     "mean_b": 237.6,
+     "mean_diff": -7.24,
+     "ci95": [
+      -9.5,
+      -5.099500000000003
+     ],
+     "pct_diff": -3.0471380471380427,
+     "shorter": 40,
+     "equal": 2,
+     "longer": 8,
+     "p_wilcoxon": 8.097304492627867e-07,
+     "r_rank_biserial": -0.8171768707482994
+    },
+    "s303 vs LLF": {
+     "mean_a": 230.36,
+     "mean_b": 237.36,
+     "mean_diff": -7.0,
+     "ci95": [
+      -9.3,
+      -4.859500000000003
+     ],
+     "pct_diff": -2.949106841927873,
+     "shorter": 40,
+     "equal": 1,
+     "longer": 9,
+     "p_wilcoxon": 1.7545394943280838e-06,
+     "r_rank_biserial": -0.7836734693877551
+    },
+    "seed mean vs best rule (LLF)": {
+     "mean_a": 230.5533333333333,
+     "mean_b": 237.36,
+     "mean_diff": -6.806666666666665,
+     "ci95": [
+      -8.953666666666665,
+      -4.8599999999999985
+     ],
+     "pct_diff": -2.867655319627027,
+     "shorter": 39,
+     "equal": 0,
+     "longer": 11,
+     "p_wilcoxon": 7.846460076525363e-07,
+     "r_rank_biserial": -0.8023529411764706
+    }
+   },
+   "best_rule": "LLF",
+   "sources": [
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_greedy-s301.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_greedy-s302.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_greedy-s303.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_FIFO.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_MOR.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_SPT.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_MWKR.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_SPTL.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_LLF.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_MWKRL.json",
+    "test_results/PPVC/10x25+ppvc-rc_project-ind/shell_LRPTL.json"
+   ]
+  },
+  "10x25+ppvc-steel_project-ind": {
+   "seed0": 750000,
+   "n_orders": 50,
+   "n_modules": 10,
+   "mix": "steel_project",
+   "mean_makespan": {
+    "SLAB s301": 225.76,
+    "SLAB s302": 221.88,
+    "SLAB s303": 225.8,
+    "SLAB seed mean": 224.48000000000002,
+    "SLAB seed std (population, of the seed means)": 1.838550153427063,
+    "FIFO": 259.9,
+    "MOR": 268.86,
+    "SPT": 234.78,
+    "MWKR": 245.92,
+    "SPTL": 235.18,
+    "LLF": 235.08,
+    "MWKRL": 230.58,
+    "LRPTL": 229.36
+   },
+   "comparisons": {
+    "seed mean vs SPT": {
+     "mean_a": 224.47999999999996,
+     "mean_b": 234.78,
+     "mean_diff": -10.300000000000002,
+     "ci95": [
+      -13.2405,
+      -7.3796666666666715
+     ],
+     "pct_diff": -4.3870857824346405,
+     "shorter": 42,
+     "equal": 2,
+     "longer": 6,
+     "p_wilcoxon": 4.984693016643068e-08,
+     "r_rank_biserial": -0.9039115646258503
+    },
+    "seed mean vs LLF": {
+     "mean_a": 224.47999999999996,
+     "mean_b": 235.08,
+     "mean_diff": -10.600000000000001,
+     "ci95": [
+      -13.506666666666666,
+      -7.726500000000004
+     ],
+     "pct_diff": -4.509103283988447,
+     "shorter": 42,
+     "equal": 1,
+     "longer": 7,
+     "p_wilcoxon": 3.179692029090361e-08,
+     "r_rank_biserial": -0.9077551020408163
+    },
+    "s301 vs SPT": {
+     "mean_a": 225.76,
+     "mean_b": 234.78,
+     "mean_diff": -9.02,
+     "ci95": [
+      -12.620499999999998,
+      -5.56
+     ],
+     "pct_diff": -3.8418945395689574,
+     "shorter": 37,
+     "equal": 1,
+     "longer": 12,
+     "p_wilcoxon": 1.272519785571501e-05,
+     "r_rank_biserial": -0.7159183673469388
+    },
+    "s301 vs LLF": {
+     "mean_a": 225.76,
+     "mean_b": 235.08,
+     "mean_diff": -9.32,
+     "ci95": [
+      -12.980999999999998,
+      -5.899500000000003
+     ],
+     "pct_diff": -3.9646077930917234,
+     "shorter": 37,
+     "equal": 1,
+     "longer": 12,
+     "p_wilcoxon": 5.423177456591381e-06,
+     "r_rank_biserial": -0.7461224489795918
+    },
+    "s302 vs SPT": {
+     "mean_a": 221.88,
+     "mean_b": 234.78,
+     "mean_diff": -12.9,
+     "ci95": [
+      -16.44,
+      -9.479500000000003
+     ],
+     "pct_diff": -5.494505494505497,
+     "shorter": 43,
+     "equal": 0,
+     "longer": 7,
+     "p_wilcoxon": 4.367937954283697e-08,
+     "r_rank_biserial": -0.8894117647058823
+    },
+    "s302 vs LLF": {
+     "mean_a": 221.88,
+     "mean_b": 235.08,
+     "mean_diff": -13.2,
+     "ci95": [
+      -16.74,
+      -9.76
+     ],
+     "pct_diff": -5.615109749872394,
+     "shorter": 43,
+     "equal": 0,
+     "longer": 7,
+     "p_wilcoxon": 3.509979553546196e-08,
+     "r_rank_biserial": -0.8956862745098039
+    },
+    "s303 vs SPT": {
+     "mean_a": 225.8,
+     "mean_b": 234.78,
+     "mean_diff": -8.98,
+     "ci95": [
+      -11.78,
+      -5.979500000000003
+     ],
+     "pct_diff": -3.8248573132294017,
+     "shorter": 39,
+     "equal": 1,
+     "longer": 10,
+     "p_wilcoxon": 1.6990354331731291e-06,
+     "r_rank_biserial": -0.7853061224489796
+    },
+    "s303 vs LLF": {
+     "mean_a": 225.8,
+     "mean_b": 235.08,
+     "mean_diff": -9.28,
+     "ci95": [
+      -12.08,
+      -6.32
+     ],
+     "pct_diff": -3.947592309001191,
+     "shorter": 39,
+     "equal": 3,
+     "longer": 8,
+     "p_wilcoxon": 1.0049379150956142e-06,
+     "r_rank_biserial": -0.8191489361702128
+    },
+    "seed mean vs best rule (LRPTL)": {
+     "mean_a": 224.47999999999996,
+     "mean_b": 229.36,
+     "mean_diff": -4.880000000000002,
+     "ci95": [
+      -7.5003333333333355,
+      -2.3328333333333373
+     ],
+     "pct_diff": -2.1276595744681104,
+     "shorter": 33,
+     "equal": 3,
+     "longer": 14,
+     "p_wilcoxon": 0.0005703993074074819,
+     "r_rank_biserial": -0.5771276595744681
+    }
+   },
+   "best_rule": "LRPTL",
+   "sources": [
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_greedy-s301.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_greedy-s302.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_greedy-s303.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_FIFO.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_MOR.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_SPT.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_MWKR.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_SPTL.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_LLF.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_MWKRL.json",
+    "test_results/PPVC/10x25+ppvc-steel_project-ind/shell_LRPTL.json"
+   ]
+  },
+  "50x25+ppvc-rc_project": {
+   "seed0": 760000,
+   "n_orders": 50,
+   "n_modules": 50,
+   "mix": "rc_project",
+   "mean_makespan": {
+    "SLAB s301": 443.38,
+    "SLAB s302": 458.54,
+    "SLAB s303": 445.46,
+    "SLAB seed mean": 449.1266666666667,
+    "SLAB seed std (population, of the seed means)": 6.710178007243107,
+    "FIFO": 751.7,
+    "MOR": 930.84,
+    "SPT": 458.3,
+    "MWKR": 695.62,
+    "SPTL": 478.12,
+    "LLF": 459.74,
+    "MWKRL": 676.56,
+    "LRPTL": 669.74
+   },
+   "comparisons": {
+    "seed mean vs SPT": {
+     "mean_a": 449.12666666666667,
+     "mean_b": 458.3,
+     "mean_diff": -9.173333333333332,
+     "ci95": [
+      -11.03333333333333,
+      -7.299833333333335
+     ],
+     "pct_diff": -2.001600116372104,
+     "shorter": 43,
+     "equal": 1,
+     "longer": 6,
+     "p_wilcoxon": 1.7325817812485825e-08,
+     "r_rank_biserial": -0.9248979591836735
+    },
+    "seed mean vs LLF": {
+     "mean_a": 449.12666666666667,
+     "mean_b": 459.74,
+     "mean_diff": -10.61333333333333,
+     "ci95": [
+      -12.626833333333332,
+      -8.546333333333333
+     ],
+     "pct_diff": -2.3085512101042593,
+     "shorter": 47,
+     "equal": 0,
+     "longer": 3,
+     "p_wilcoxon": 8.98103844752913e-09,
+     "r_rank_biserial": -0.9341176470588235
+    },
+    "s301 vs SPT": {
+     "mean_a": 443.38,
+     "mean_b": 458.3,
+     "mean_diff": -14.92,
+     "ci95": [
+      -17.86,
+      -12.0
+     ],
+     "pct_diff": -3.2555094915993954,
+     "shorter": 47,
+     "equal": 0,
+     "longer": 3,
+     "p_wilcoxon": 1.0865155485449387e-08,
+     "r_rank_biserial": -0.9286274509803921
+    },
+    "s301 vs LLF": {
+     "mean_a": 443.38,
+     "mean_b": 459.74,
+     "mean_diff": -16.36,
+     "ci95": [
+      -19.58,
+      -13.059500000000003
+     ],
+     "pct_diff": -3.5585330839170037,
+     "shorter": 47,
+     "equal": 0,
+     "longer": 3,
+     "p_wilcoxon": 1.8076605033538058e-08,
+     "r_rank_biserial": -0.9145098039215687
+    },
+    "s302 vs SPT": {
+     "mean_a": 458.54,
+     "mean_b": 458.3,
+     "mean_diff": 0.24,
+     "ci95": [
+      -2.0604999999999993,
+      2.5609999999999946
+     ],
+     "pct_diff": 0.052367444905088156,
+     "shorter": 24,
+     "equal": 1,
+     "longer": 25,
+     "p_wilcoxon": 0.9325350935466576,
+     "r_rank_biserial": 0.013877551020408163
+    },
+    "s302 vs LLF": {
+     "mean_a": 458.54,
+     "mean_b": 459.74,
+     "mean_diff": -1.2,
+     "ci95": [
+      -3.460999999999998,
+      1.08
+     ],
+     "pct_diff": -0.2610170966198311,
+     "shorter": 26,
+     "equal": 0,
+     "longer": 24,
+     "p_wilcoxon": 0.39523767874094384,
+     "r_rank_biserial": -0.1380392156862745
+    },
+    "s303 vs SPT": {
+     "mean_a": 445.46,
+     "mean_b": 458.3,
+     "mean_diff": -12.84,
+     "ci95": [
+      -15.3005,
+      -10.28
+     ],
+     "pct_diff": -2.8016583024220054,
+     "shorter": 45,
+     "equal": 1,
+     "longer": 4,
+     "p_wilcoxon": 2.8070595068754912e-08,
+     "r_rank_biserial": -0.9110204081632653
+    },
+    "s303 vs LLF": {
+     "mean_a": 445.46,
+     "mean_b": 459.74,
+     "mean_diff": -14.28,
+     "ci95": [
+      -16.6805,
+      -11.619500000000002
+     ],
+     "pct_diff": -3.1061034497759654,
+     "shorter": 46,
+     "equal": 0,
+     "longer": 4,
+     "p_wilcoxon": 1.0182278965390675e-08,
+     "r_rank_biserial": -0.9301960784313725
+    },
+    "seed mean vs best rule (SPT)": {
+     "mean_a": 449.12666666666667,
+     "mean_b": 458.3,
+     "mean_diff": -9.173333333333332,
+     "ci95": [
+      -11.03333333333333,
+      -7.299833333333335
+     ],
+     "pct_diff": -2.001600116372104,
+     "shorter": 43,
+     "equal": 1,
+     "longer": 6,
+     "p_wilcoxon": 1.7325817812485825e-08,
+     "r_rank_biserial": -0.9248979591836735
+    }
+   },
+   "best_rule": "SPT",
+   "sources": [
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_greedy-s301.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_greedy-s302.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_greedy-s303.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_FIFO.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_MOR.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_SPT.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_MWKR.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_SPTL.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_LLF.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_MWKRL.json",
+    "test_results/PPVC/50x25+ppvc-rc_project/shell_LRPTL.json"
+   ]
+  },
+  "50x25+ppvc-steel_project": {
+   "seed0": 770000,
+   "n_orders": 50,
+   "n_modules": 50,
+   "mix": "steel_project",
+   "mean_makespan": {
+    "SLAB s301": 570.7,
+    "SLAB s302": 554.32,
+    "SLAB s303": 563.88,
+    "SLAB seed mean": 562.9666666666667,
+    "SLAB seed std (population, of the seed means)": 6.71822066390267,
+    "FIFO": 768.92,
+    "MOR": 893.56,
+    "SPT": 579.78,
+    "MWKR": 668.62,
+    "SPTL": 587.22,
+    "LLF": 579.28,
+    "MWKRL": 668.64,
+    "LRPTL": 662.94
+   },
+   "comparisons": {
+    "seed mean vs SPT": {
+     "mean_a": 562.9666666666667,
+     "mean_b": 579.78,
+     "mean_diff": -16.813333333333333,
+     "ci95": [
+      -20.1535,
+      -13.49316666666666
+     ],
+     "pct_diff": -2.8999505559579974,
+     "shorter": 46,
+     "equal": 0,
+     "longer": 4,
+     "p_wilcoxon": 3.1689692336030434e-09,
+     "r_rank_biserial": -0.9623529411764706
+    },
+    "seed mean vs LLF": {
+     "mean_a": 562.9666666666667,
+     "mean_b": 579.28,
+     "mean_diff": -16.313333333333333,
+     "ci95": [
+      -19.220833333333342,
+      -13.333333333333332
+     ],
+     "pct_diff": -2.8161395755650576,
+     "shorter": 48,
+     "equal": 0,
+     "longer": 2,
+     "p_wilcoxon": 1.4640738207133074e-09,
+     "r_rank_biserial": -0.9827450980392157
+    },
+    "s301 vs SPT": {
+     "mean_a": 570.7,
+     "mean_b": 579.78,
+     "mean_diff": -9.08,
+     "ci95": [
+      -12.680999999999997,
+      -5.86
+     ],
+     "pct_diff": -1.5661112835903102,
+     "shorter": 37,
+     "equal": 1,
+     "longer": 12,
+     "p_wilcoxon": 1.8797716108251727e-05,
+     "r_rank_biserial": -0.7020408163265306
+    },
+    "s301 vs LLF": {
+     "mean_a": 570.7,
+     "mean_b": 579.28,
+     "mean_diff": -8.58,
+     "ci95": [
+      -11.98,
+      -5.32
+     ],
+     "pct_diff": -1.4811490125673177,
+     "shorter": 35,
+     "equal": 1,
+     "longer": 14,
+     "p_wilcoxon": 2.7341504769962836e-05,
+     "r_rank_biserial": -0.6881632653061225
+    },
+    "s302 vs SPT": {
+     "mean_a": 554.32,
+     "mean_b": 579.78,
+     "mean_diff": -25.46,
+     "ci95": [
+      -29.6205,
+      -21.4
+     ],
+     "pct_diff": -4.391320845838065,
+     "shorter": 48,
+     "equal": 0,
+     "longer": 2,
+     "p_wilcoxon": 1.1084321434856718e-09,
+     "r_rank_biserial": -0.9898039215686274
+    },
+    "s302 vs LLF": {
+     "mean_a": 554.32,
+     "mean_b": 579.28,
+     "mean_diff": -24.96,
+     "ci95": [
+      -28.64,
+      -21.2195
+     ],
+     "pct_diff": -4.308797127468567,
+     "shorter": 50,
+     "equal": 0,
+     "longer": 0,
+     "p_wilcoxon": 7.517719802882833e-10,
+     "r_rank_biserial": -1.0
+    },
+    "s303 vs SPT": {
+     "mean_a": 563.88,
+     "mean_b": 579.78,
+     "mean_diff": -15.9,
+     "ci95": [
+      -20.580499999999997,
+      -10.919500000000003
+     ],
+     "pct_diff": -2.7424195384456174,
+     "shorter": 39,
+     "equal": 0,
+     "longer": 11,
+     "p_wilcoxon": 1.6749588421391646e-06,
+     "r_rank_biserial": -0.7780392156862745
+    },
+    "s303 vs LLF": {
+     "mean_a": 563.88,
+     "mean_b": 579.28,
+     "mean_diff": -15.4,
+     "ci95": [
+      -19.8005,
+      -10.66
+     ],
+     "pct_diff": -2.6584725866592995,
+     "shorter": 41,
+     "equal": 0,
+     "longer": 9,
+     "p_wilcoxon": 4.993010059752083e-07,
+     "r_rank_biserial": -0.8164705882352942
+    },
+    "seed mean vs best rule (LLF)": {
+     "mean_a": 562.9666666666667,
+     "mean_b": 579.28,
+     "mean_diff": -16.313333333333333,
+     "ci95": [
+      -19.220833333333342,
+      -13.333333333333332
+     ],
+     "pct_diff": -2.8161395755650576,
+     "shorter": 48,
+     "equal": 0,
+     "longer": 2,
+     "p_wilcoxon": 1.4640738207133074e-09,
+     "r_rank_biserial": -0.9827450980392157
+    }
+   },
+   "best_rule": "LLF",
+   "sources": [
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_greedy-s301.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_greedy-s302.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_greedy-s303.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_FIFO.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_MOR.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_SPT.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_MWKR.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_SPTL.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_LLF.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_MWKRL.json",
+    "test_results/PPVC/50x25+ppvc-steel_project/shell_LRPTL.json"
+   ]
+  },
+  "10x25+ppvc-rc_project": {
+   "seed0": 90000,
+   "n_orders": 50,
+   "n_modules": 10,
+   "mix": "rc_project",
+   "mean_makespan": {
+    "SLAB s301": 229.34,
+    "SLAB s302": 231.34,
+    "SLAB s303": 230.68,
+    "SLAB seed mean": 230.45333333333335,
+    "SLAB seed std (population, of the seed means)": 0.832079056073133,
+    "FIFO": 258.68,
+    "MOR": 263.06,
+    "SPT": 235.8,
+    "MWKR": 247.74,
+    "SPTL": 236.16,
+    "LLF": 235.8,
+    "MWKRL": 239.6,
+    "LRPTL": 239.26
+   },
+   "comparisons": {
+    "seed mean vs SPT": {
+     "mean_a": 230.45333333333332,
+     "mean_b": 235.8,
+     "mean_diff": -5.346666666666668,
+     "ci95": [
+      -7.300166666666666,
+      -3.433333333333335
+     ],
+     "pct_diff": -2.267458297992664,
+     "shorter": 40,
+     "equal": 1,
+     "longer": 9,
+     "p_wilcoxon": 1.0473027920204996e-05,
+     "r_rank_biserial": -0.723265306122449
+    },
+    "seed mean vs LLF": {
+     "mean_a": 230.45333333333332,
+     "mean_b": 235.8,
+     "mean_diff": -5.346666666666668,
+     "ci95": [
+      -7.326666666666667,
+      -3.359000000000007
+     ],
+     "pct_diff": -2.267458297992664,
+     "shorter": 41,
+     "equal": 0,
+     "longer": 9,
+     "p_wilcoxon": 1.0002419418664386e-05,
+     "r_rank_biserial": -0.7176470588235294
+    },
+    "s301 vs SPT": {
+     "mean_a": 229.34,
+     "mean_b": 235.8,
+     "mean_diff": -6.46,
+     "ci95": [
+      -8.32,
+      -4.64
+     ],
+     "pct_diff": -2.7396098388464796,
+     "shorter": 43,
+     "equal": 1,
+     "longer": 6,
+     "p_wilcoxon": 3.603992973053258e-07,
+     "r_rank_biserial": -0.8342857142857143
+    },
+    "s301 vs LLF": {
+     "mean_a": 229.34,
+     "mean_b": 235.8,
+     "mean_diff": -6.46,
+     "ci95": [
+      -8.360499999999998,
+      -4.56
+     ],
+     "pct_diff": -2.7396098388464796,
+     "shorter": 43,
+     "equal": 0,
+     "longer": 7,
+     "p_wilcoxon": 4.1179613922352103e-07,
+     "r_rank_biserial": -0.8219607843137255
+    },
+    "s302 vs SPT": {
+     "mean_a": 231.34,
+     "mean_b": 235.8,
+     "mean_diff": -4.46,
+     "ci95": [
+      -6.62,
+      -2.36
+     ],
+     "pct_diff": -1.8914334181509784,
+     "shorter": 37,
+     "equal": 2,
+     "longer": 11,
+     "p_wilcoxon": 0.0005840703983929983,
+     "r_rank_biserial": -0.5697278911564626
+    },
+    "s302 vs LLF": {
+     "mean_a": 231.34,
+     "mean_b": 235.8,
+     "mean_diff": -4.46,
+     "ci95": [
+      -6.6404999999999985,
+      -2.26
+     ],
+     "pct_diff": -1.8914334181509784,
+     "shorter": 35,
+     "equal": 3,
+     "longer": 12,
+     "p_wilcoxon": 0.0005635548509326666,
+     "r_rank_biserial": -0.5771276595744681
+    },
+    "s303 vs SPT": {
+     "mean_a": 230.68,
+     "mean_b": 235.8,
+     "mean_diff": -5.12,
+     "ci95": [
+      -7.3,
+      -3.079500000000003
+     ],
+     "pct_diff": -2.171331636980489,
+     "shorter": 39,
+     "equal": 2,
+     "longer": 9,
+     "p_wilcoxon": 6.535839220587819e-05,
+     "r_rank_biserial": -0.6615646258503401
+    },
+    "s303 vs LLF": {
+     "mean_a": 230.68,
+     "mean_b": 235.8,
+     "mean_diff": -5.12,
+     "ci95": [
+      -7.34,
+      -2.96
+     ],
+     "pct_diff": -2.171331636980489,
+     "shorter": 41,
+     "equal": 1,
+     "longer": 8,
+     "p_wilcoxon": 9.327308404529035e-05,
+     "r_rank_biserial": -0.6408163265306123
+    },
+    "seed mean vs best rule (SPT)": {
+     "mean_a": 230.45333333333332,
+     "mean_b": 235.8,
+     "mean_diff": -5.346666666666668,
+     "ci95": [
+      -7.300166666666666,
+      -3.433333333333335
+     ],
+     "pct_diff": -2.267458297992664,
+     "shorter": 40,
+     "equal": 1,
+     "longer": 9,
+     "p_wilcoxon": 1.0473027920204996e-05,
+     "r_rank_biserial": -0.723265306122449
+    }
+   },
+   "best_rule": "SPT",
+   "sources": [
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_greedy-s301.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_greedy-s302.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_greedy-s303.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_FIFO.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_MOR.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_SPT.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_MWKR.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_SPTL.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_LLF.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_MWKRL.json",
+    "test_results/PPVC/10x25+ppvc-rc_project/shell_LRPTL.json"
+   ]
+  },
+  "10x25+ppvc-steel_project": {
+   "seed0": 95000,
+   "n_orders": 50,
+   "n_modules": 10,
+   "mix": "steel_project",
+   "mean_makespan": {
+    "SLAB s301": 223.8,
+    "SLAB s302": 221.46,
+    "SLAB s303": 227.8,
+    "SLAB seed mean": 224.35333333333332,
+    "SLAB seed std (population, of the seed means)": 2.6177004327377804,
+    "FIFO": 259.56,
+    "MOR": 266.54,
+    "SPT": 235.88,
+    "MWKR": 242.78,
+    "SPTL": 236.12,
+    "LLF": 235.78,
+    "MWKRL": 227.76,
+    "LRPTL": 226.38
+   },
+   "comparisons": {
+    "seed mean vs SPT": {
+     "mean_a": 224.35333333333335,
+     "mean_b": 235.88,
+     "mean_diff": -11.526666666666664,
+     "ci95": [
+      -14.33333333333333,
+      -8.5065
+     ],
+     "pct_diff": -4.886665536148316,
+     "shorter": 42,
+     "equal": 0,
+     "longer": 8,
+     "p_wilcoxon": 9.622295119430067e-08,
+     "r_rank_biserial": -0.8666666666666667
+    },
+    "seed mean vs LLF": {
+     "mean_a": 224.35333333333335,
+     "mean_b": 235.78,
+     "mean_diff": -11.426666666666662,
+     "ci95": [
+      -14.2735,
+      -8.359833333333333
+     ],
+     "pct_diff": -4.84632567082307,
+     "shorter": 42,
+     "equal": 0,
+     "longer": 8,
+     "p_wilcoxon": 9.363226630750298e-08,
+     "r_rank_biserial": -0.8674509803921568
+    },
+    "s301 vs SPT": {
+     "mean_a": 223.8,
+     "mean_b": 235.88,
+     "mean_diff": -12.08,
+     "ci95": [
+      -15.34,
+      -8.44
+     ],
+     "pct_diff": -5.121248092250285,
+     "shorter": 42,
+     "equal": 0,
+     "longer": 8,
+     "p_wilcoxon": 5.400423272858187e-07,
+     "r_rank_biserial": -0.8141176470588235
+    },
+    "s301 vs LLF": {
+     "mean_a": 223.8,
+     "mean_b": 235.78,
+     "mean_diff": -11.98,
+     "ci95": [
+      -15.22,
+      -8.359500000000002
+     ],
+     "pct_diff": -5.081007719060137,
+     "shorter": 42,
+     "equal": 0,
+     "longer": 8,
+     "p_wilcoxon": 6.234074905463101e-07,
+     "r_rank_biserial": -0.8094117647058824
+    },
+    "s302 vs SPT": {
+     "mean_a": 221.46,
+     "mean_b": 235.88,
+     "mean_diff": -14.42,
+     "ci95": [
+      -17.6805,
+      -11.08
+     ],
+     "pct_diff": -6.1132779379345354,
+     "shorter": 44,
+     "equal": 0,
+     "longer": 6,
+     "p_wilcoxon": 2.8216881053375062e-08,
+     "r_rank_biserial": -0.9019607843137255
+    },
+    "s302 vs LLF": {
+     "mean_a": 221.46,
+     "mean_b": 235.78,
+     "mean_diff": -14.32,
+     "ci95": [
+      -17.64,
+      -10.879500000000004
+     ],
+     "pct_diff": -6.07345830859275,
+     "shorter": 44,
+     "equal": 0,
+     "longer": 6,
+     "p_wilcoxon": 3.9201471490375546e-08,
+     "r_rank_biserial": -0.8925490196078432
+    },
+    "s303 vs SPT": {
+     "mean_a": 227.8,
+     "mean_b": 235.88,
+     "mean_diff": -8.08,
+     "ci95": [
+      -11.38,
+      -4.66
+     ],
+     "pct_diff": -3.425470578260126,
+     "shorter": 34,
+     "equal": 4,
+     "longer": 12,
+     "p_wilcoxon": 9.307134309625787e-05,
+     "r_rank_biserial": -0.6614246068455134
+    },
+    "s303 vs LLF": {
+     "mean_a": 227.8,
+     "mean_b": 235.78,
+     "mean_diff": -7.98,
+     "ci95": [
+      -11.34,
+      -4.539500000000003
+     ],
+     "pct_diff": -3.384510984816347,
+     "shorter": 36,
+     "equal": 3,
+     "longer": 11,
+     "p_wilcoxon": 0.00013503698526256912,
+     "r_rank_biserial": -0.6391843971631206
+    },
+    "seed mean vs best rule (LRPTL)": {
+     "mean_a": 224.35333333333335,
+     "mean_b": 226.38,
+     "mean_diff": -2.0266666666666646,
+     "ci95": [
+      -4.61333333333333,
+      0.6400000000000012
+     ],
+     "pct_diff": -0.895249874841697,
+     "shorter": 30,
+     "equal": 2,
+     "longer": 18,
+     "p_wilcoxon": 0.11180775994938605,
+     "r_rank_biserial": -0.26360544217687076
+    }
+   },
+   "best_rule": "LRPTL",
+   "sources": [
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_greedy-s301.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_greedy-s302.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_greedy-s303.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_FIFO.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_MOR.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_SPT.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_MWKR.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_SPTL.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_LLF.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_MWKRL.json",
+    "test_results/PPVC/10x25+ppvc-steel_project/shell_LRPTL.json"
+   ]
+  }
+ }
+}

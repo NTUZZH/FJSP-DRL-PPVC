@@ -14,6 +14,9 @@ Modes
             on stdout; a failed assertion on a present source fails the run
             (exit 1, nothing written)
   --strict  a missing source also fails the run (exit 2, nothing written)
+  PAPER_DISRUPT_STATS=0 (environment) leaves out the paired tests of
+            Table IX (Diff/CiLo/CiHi/Pval/Rbis/PvalDis<R>Holm macros), which
+            are built by default
 
 Conventions
   makespans in hours with 1 decimal; percentages with 1 decimal and no % sign;
@@ -84,7 +87,10 @@ N_INST = {'10x25+ppvc-mixed': 100, '20x25+ppvc-mixed': 50,
           '50x25+ppvc-mixed-ind': 50, '80x25+ppvc-mixed-ind': 50,
           '10x25+ppvc-mixed-var': 100, '20x25+ppvc-mixed-var': 50,
           '50x25+ppvc-mixed-var': 50, '80x25+ppvc-mixed-var': 50,
-          '10x25+ppvc-mixed-lagx1.5': 100, '50x25+ppvc-mixed-lagx1.5': 50}
+          '10x25+ppvc-mixed-lagx1.5': 100, '50x25+ppvc-mixed-lagx1.5': 50,
+          # single-shell project sets (eval_shell_projects.py, 2026-10-12)
+          '10x25+ppvc-rc_project-ind': 50, '10x25+ppvc-steel_project-ind': 50,
+          '50x25+ppvc-rc_project': 50, '50x25+ppvc-steel_project': 50}
 
 SEEDS = (301, 302, 303)
 SEED_PAT = '30{1,2,3}'
@@ -188,6 +194,8 @@ def fmt(kind, x):
         return str(int(x))
     if kind == 'round_int':
         return dec(x, 0)
+    if kind == 'round_int_sep':
+        return f'{int(dec(x, 0)):,}'
     if kind == 'median':
         return str(int(x)) if float(x).is_integer() else dec(x, 1)
     if kind == 'p':
@@ -394,9 +402,9 @@ def rule_col(r, ds):
 
 
 @functools.lru_cache(maxsize=None)
-def anytime(ds, file_mode, t, rec_mode, n=None, model=None):
+def anytime(ds, file_mode, t, rec_mode, n=None, model=None, workers=4):
     """Records of one anytime CP-SAT file, ordered by instance id."""
-    path = os.path.join(AT, f'{ds}_{file_mode}_{t}s_w4.jsonl')
+    path = os.path.join(AT, f'{ds}_{file_mode}_{t}s_w{workers}.jsonl')
     recs = read_jsonl(path)
     n = N_INST[ds] if n is None else n
     by = {}
@@ -406,6 +414,7 @@ def anytime(ds, file_mode, t, rec_mode, n=None, model=None):
         check(r['dataset'] == ds and r['mode'] == rec_mode
               and float(r['time_limit_s']) == float(t), f'{where}: header')
         check(r['instance'] == f'instance_{i:03d}', f'{where}: name')
+        check(int(r.get('num_workers', workers)) == workers, f'{where}: workers')
         check(i not in by, f'{where}: duplicate record')
         by[i] = r
     if len(by) < n:
@@ -425,8 +434,8 @@ def anytime(ds, file_mode, t, rec_mode, n=None, model=None):
     return tuple(by[i] for i in range(n))
 
 
-def any_rel(ds, file_mode, t):
-    return f'or_solution/PPVC/anytime/{ds}_{file_mode}_{t}s_w4.jsonl'
+def any_rel(ds, file_mode, t, workers=4):
+    return f'or_solution/PPVC/anytime/{ds}_{file_mode}_{t}s_w{workers}.jsonl'
 
 
 def cp_budget(S):
@@ -448,27 +457,61 @@ def cp_src(ds, S, mode):
     return any_rel(ds, mode, cp_budget(S))
 
 
-def ma_rel(ds, budget=300):
-    return f'test_results/PPVC/{ds}/Result_MA{budget}+memetic_{ds}.json'
+# Memetic algorithm with the fast exact evaluator (fast_lpath.py, 2026-10-12;
+# bit-identical to right_shift_repair): 'pm1' = local search on every child,
+# the comparator of the paper; 'pub' = the published local-search rate 0.05.
+# The slow-evaluator runs of 2026-10-01 stay in test_results/PPVC/<ds>/.
+MA_VARIANTS = {'pm1': ('memetic_fast_pm1', 1.0), 'pub': ('memetic_fast', 0.05)}
+MA_MNI = 1000000
+
+
+def ma_rel(ds, budget=300, variant='pm1'):
+    return (f'test_results/PPVC/{ds}/{MA_VARIANTS[variant][0]}/'
+            f'Result_MA{budget}+memetic_{ds}.json')
 
 
 @functools.lru_cache(maxsize=None)
-def memetic(ds, budget=300):
-    path = os.path.join(REPO, ma_rel(ds, budget))
-    d = read_json(path)
-    n, where = N_INST[ds], ma_rel(ds, budget)
+def memetic_file(ds, budget=300, variant='pm1', n=None):
+    """One merged result file of the memetic algorithm. Records replaced by a
+    rerun (listed under 'reruns') are the final records in 'instances'."""
+    where = ma_rel(ds, budget, variant)
+    d = read_json(os.path.join(REPO, where))
+    n = N_INST[ds] if n is None else n
     check(d['dataset'] == ds and float(d['budget_s']) == float(budget),
           f'{where}: header')
     check(d['n_instances'] == n and len(d['instances']) == n,
           f'{where}: {d["n_instances"]} instances, expected {n}')
+    check(d.get('fast_eval') is True
+          and float(d['params']['pm']) == MA_VARIANTS[variant][1]
+          and int(d['params']['mni']) == MA_MNI and int(d['max_gens']) == MA_MNI
+          and int(d['seed']) == 0 and int(d['seed_test']) == 50,
+          f'{where}: run settings')
     check_contention_summary(d.get('contention'), where)
-    vals = []
     for i, r in enumerate(d['instances']):
         check(r['instance'] == f'instance_{i:03d}', f'{where}: order at {i}')
         check(r['validator_violations'] == 0, f'{where}: violations at {i}')
         check_evidence(r, f'{where} instance {i}')
-        vals.append(float(r['best_makespan']))
-    return np.array(vals)
+        check(r['status'] in ('budget', 'max_gens')
+              and (r['status'] == 'max_gens') == (int(r['generations']) == MA_MNI)
+              and (r['status'] != 'budget' or r['hit_limit'] is True),
+              f'{where}: stop status at {i}')
+    for rr in d.get('reruns', []):
+        r = d['instances'][int(rr['index'])]
+        check(r['instance'] == rr['instance']
+              and float(r['cpu_share']) == float(rr['new_cpu_share'])
+              and float(rr['new_cpu_share']) >= LOW_CPU_SHARE,
+              f'{where}: rerun of {rr["instance"]} is not the final record')
+    return d
+
+
+@functools.lru_cache(maxsize=None)
+def memetic(ds, budget=300, variant='pm1', n=None):
+    d = memetic_file(ds, budget, variant, n)
+    return np.array([float(r['best_makespan']) for r in d['instances']])
+
+
+def ma_field(ds, field, variant='pm1'):
+    return np.array([float(r[field]) for r in memetic_file(ds, 300, variant)['instances']])
 
 
 def ga_rel(ds, budget):
@@ -673,7 +716,9 @@ def reactive(ds, dtype, n):
 
 
 def dis_value(ds, n, dtype, key, field):
-    d = reactive(ds, dtype, n)
+    # the GA arm comes from the fast-decoder rerun (gafast_file asserts the
+    # same states and SLAB records as the Table IX file)
+    d = gafast_file(ds, dtype, n) if key == 'ga_reactive' else reactive(ds, dtype, n)
     v = np.asarray(d['records'][key][field], dtype=float)
     check(bool(np.all(np.isfinite(v))), f'{dis_rel(ds, dtype)}: {key} {field} NaN')
     return float(v.mean())
@@ -893,10 +938,6 @@ def table3():
            f'{any_rel("50x25+ppvc-mixed", "warm-spt", 1800)}, '
            f'{any_rel("80x25+ppvc-mixed", "warm-spt", 1800)}',
            'instances per 1800 s file (ids 0..19 asserted)')
-    for name, b in (('GaSixtyTen', 60), ('GaThreeHundredTen', 300)):
-        define(name, ex, 'scalars', name, 'h',
-               lambda b=b: ga(ds10, b).mean(), ga_rel(ds10, b),
-               f'mean makespan of the GA, {b} s per instance')
     exi = 'Table III independent sets'
     for S, ds in SIZES_IND:
         sp, hs, lf = rule_src('SPT', ds), src(HSTAR, ds), src(LAGFREE, ds)
@@ -1060,12 +1101,15 @@ def table6():
                 define(f'Dis{T}{M}{S}', ex, f'Dis{T}{M}', S, 'h',
                        lambda d=ds, n=n, t=dtype, k=key:
                            dis_value(d, n, t, k, 'makespan'),
-                       dis_rel(ds, dtype),
+                       gafast_rel(ds, dtype) if key == 'ga_reactive'
+                       else dis_rel(ds, dtype),
                        f'mean realized makespan of {key} over {n} instances (h)')
-        allsrc = (f'test_results/PPVC/{ds}/reactive_hstar/reactive_'
-                  '{lag_perturb,breakdown,urgent_arrival,material_shortage,'
-                  f'pt_deviation,cancellation}}_{HSTAR_MODEL}.npy')
+        allsrc0 = (f'test_results/PPVC/{ds}/reactive_hstar/reactive_'
+                   '{lag_perturb,breakdown,urgent_arrival,material_shortage,'
+                   f'pt_deviation,cancellation}}_{HSTAR_MODEL}.npy')
         for M, key in DIS_METHODS:
+            allsrc = (allsrc0.replace('/reactive_hstar/', '/reactive_hstar_gafast/')
+                      if key == 'ga_reactive' else allsrc0)
             if M in NERV_METHODS:
                 define(f'DisNerv{M}{S}', ex, f'DisNerv{M}', S, 'h',
                        lambda d=ds, n=n, k=key: float(np.mean(
@@ -1403,8 +1447,12 @@ def reset():
     REG.clear()
     del FAILS[:]
     for fn in (result, rule_col, anytime, memetic, ga, training_load,
-               stoch_nominal, stoch, stoch_consistency, reactive,
-               buffer_records, pval, holm_family):
+               stoch_nominal, stoch, stoch_consistency, reactive, memetic_file,
+               buffer_records, pval, holm_family, sha256_of, tightness,
+               shell_meta, shell, shell_test, reach_times, train_test,
+               train_holm, stoch_test, stoch_holm, resid_file, dis_test,
+               dis_holm, rules_file, sev_file, stab50, gafast_file,
+               anytime_parts):
         fn.cache_clear()
 
 
@@ -1496,11 +1544,14 @@ def extras():
 
     def resid(S, t):
         ds = {'Ten': '10x25+ppvc-mixed', 'Fifty': '50x25+ppvc-mixed'}[S]
-        # hinted run of 2026-10-11 (right-shifted plan as AddHint); the cold run stays in reactive_hstar/
-        f = f'test_results/PPVC/{ds}/reactive_hstar_hint/residual_cpsat_{t}.npy'
+        # hinted residual CP-SAT (right-shifted plan as AddHint), re-solved on
+        # 2026-10-12 on exactly the SLAB states of the Table IX reactive files
+        # (resid_file() asserts the match); the hinted run of 2026-10-11 stays
+        # in reactive_hstar_hint/ and the cold run in reactive_hstar/
+        f = resid_rel(ds, t)
         if not os.path.exists(f):
             raise Missing(f'Res{S}', f'missing {f}')
-        d = np.load(f, allow_pickle=True).item()
+        d = resid_file(ds, t, 100 if S == 'Ten' else 20)
         check(d['meta']['model_name'] == HSTAR_MODEL, f'{f}: model {d["meta"]["model_name"]}')
         check(int(d['meta']['n_instances']) == (100 if S == 'Ten' else 20), f'{f}: n')
         check(int(d['meta']['cpsat_workers']) == 2, f'{f}: workers')
@@ -1518,7 +1569,7 @@ def extras():
             for B, key in (('Five', 'residual_cpsat_5s'), ('Thirty', 'residual_cpsat_30s')):
                 define(f'Dis{T}Res{B}{S}', ex, f'DisRes{B}{S}', T, 'h',
                        lambda S=S, t=t, k=key: res_mean(S, t, k),
-                       f'reactive_hstar/residual_cpsat_{t}.npy',
+                       f'reactive_hstar_hint_fix/residual_cpsat_{t}.npy',
                        f'mean makespan, residual CP-SAT {B} s re-plan keeping committed operations, 2 workers')
     def res_field_mean(S, key, field):
         return float(np.mean([np.mean(np.asarray(resid(S, t)['records'][key][field], dtype=float))
@@ -1527,10 +1578,10 @@ def extras():
         for B, key in (('Five', 'residual_cpsat_5s'), ('Thirty', 'residual_cpsat_30s')):
             define(f'DisNervRes{B}{S}', ex, f'DisNervRes{B}', S, 'h',
                    lambda S=S, k=key: res_field_mean(S, k, 'comb_nerv'),
-                   'reactive_hstar/residual_cpsat_*.npy', 'mean over six types of mean comb_nerv (station reassignments + starts moved > 1 h)')
+                   'reactive_hstar_hint_fix/residual_cpsat_*.npy', 'mean over six types of mean comb_nerv (station reassignments + starts moved > 1 h)')
             define(f'DisTimeRes{B}{S}', ex, f'DisTimeRes{B}', S, 's',
                    lambda S=S, k=key: res_field_mean(S, k, 'seconds'),
-                   'reactive_hstar/residual_cpsat_*.npy', 'mean over six types of mean re-plan seconds')
+                   'reactive_hstar_hint_fix/residual_cpsat_*.npy', 'mean over six types of mean re-plan seconds')
     define('ResGapMinFifty', ex, 'scalars', 'ResGapMinFifty', 'pct',
            lambda: min(pct(shown(f'Dis{T}ResThirtyFifty'), shown(f'Dis{T}SlabFifty')) for T, _ in TYPES),
            'Dis*ResThirtyFifty, Dis*SlabFifty', 'min over types of 100*(residual CP-SAT 30 s / SLAB re-planning - 1), 50 modules')
@@ -1545,7 +1596,7 @@ def extras():
            'Dis*ResFiveFifty, Dis*SlabFifty', 'min over types of 100*(residual CP-SAT 5 s / SLAB re-planning - 1), 50 modules, from the one-decimal table values')
     define('ResOptMinTen', ex, 'scalars', 'ResOptMinTen', 'int',
            lambda: min(int(resid('Ten', t)['optimal_count'][5]) for _, t in TYPES),
-           'reactive_hstar/residual_cpsat_*.npy (10x25)', 'min over types of orders re-planned to proven optimality within 5 s (of 100)')
+           'reactive_hstar_hint_fix/residual_cpsat_*.npy (10x25)', 'min over types of orders re-planned to proven optimality within 5 s (of 100)')
     define('ResGainMaxTen', ex, 'scalars', 'ResGainMaxTen', 'h',
            lambda: max(shown(f'Dis{T}SlabTen') - shown(f'Dis{T}ResFiveTen') for T, _ in TYPES),
            'Dis*SlabTen, Dis*ResFiveTen', 'max over types of SLAB minus residual CP-SAT 5 s (h), 10 modules, from the one-decimal table values')
@@ -1602,6 +1653,1304 @@ def extras():
            'min over cv of 100*(CP-SAT plan + repair / SLAB re-planning - 1), uncertain waits, 50 modules')
 
 
+# --------------------------------------------------------------------------- #
+# Revision results of 2026-10-12: tightness of the two bounds (Section S4),
+# single-shell orders and CP-SAT time to reach SLAB (Section S1), the paired
+# tests of Tables VII, VIII and IX (Section S2), the rule re-planners, the
+# breakdown severity and the 50-module stability sweep (Section S8). The
+# Table IX tests are built unless the environment sets PAPER_DISRUPT_STATS=0.
+# --------------------------------------------------------------------------- #
+DISRUPT_STATS = os.environ.get('PAPER_DISRUPT_STATS', '1') != '0'
+N_BOOT, BOOT_SEED = 2000, 0
+BOOT_NOTE = ('95% percentile bootstrap, 2000 resamples, numpy default_rng(0) '
+             '(stats_tests.paired_mean_diff_ci)')
+
+
+@functools.lru_cache(maxsize=None)
+def sha256_of(path_rel):
+    import hashlib
+    path = guard(os.path.join(REPO, path_rel))
+    if not os.path.exists(path):
+        raise Missing(path_rel, 'file absent')
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def ckpt_rel(model):
+    return f'trained_network/PPVC/{model}.pth'
+
+
+def seed_model(s):
+    """Model name of the SLAB policy of training seed s."""
+    return HSTAR.format(s=s)[len('greedy+'):]
+
+
+def paired_test(a, b):
+    """Mean paired difference a - b with its bootstrap CI, two-sided Wilcoxon
+    p (zeros dropped) and rank-biserial r (r < 0: a shorter)."""
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    check(a.ndim == 1 and a.shape == b.shape and a.size > 0,
+          f'pairing shapes {a.shape} {b.shape}')
+    check(bool(np.all(np.isfinite(a)) and np.all(np.isfinite(b))),
+          'non-finite value in a paired test')
+    d, (lo, hi) = paired_mean_diff_ci(a, b, n_boot=N_BOOT, seed=BOOT_SEED)
+    return dict(n=int(a.size), diff=float(d), lo=float(lo), hi=float(hi),
+                p=float(wilcoxon_paired(a, b, zero_method='wilcox')),
+                r=float(rank_biserial(a, b)), mean_a=float(a.mean()),
+                mean_b=float(b.mean()), shorter=int(np.sum(a < b)),
+                equal=int(np.sum(a == b)), longer=int(np.sum(a > b)))
+
+
+STAT_MACROS = (('Diff', 'diff', 'h', 'mean paired difference SLAB minus rival (h)'),
+               ('CiLo', 'lo', 'h', 'low end of the ' + BOOT_NOTE),
+               ('CiHi', 'hi', 'h', 'high end of the ' + BOOT_NOTE),
+               ('Pval', 'p', 'p', 'two-sided Wilcoxon signed-rank p, zeros dropped '
+                                  '(stats_tests.wilcoxon_paired)'),
+               ('Rbis', 'r', 'r', 'matched-pairs rank-biserial r of SLAB minus '
+                                  'rival (r < 0 favours SLAB; stats_tests.rank_biserial)'))
+
+
+def define_tests(ex, stem, col, test_fn, srcs, pairing):
+    """Diff, CI, p and r macros of one paired test: <Stat><stem><col>."""
+    for stat, key, kind, what in STAT_MACROS:
+        define(f'{stat}{stem}{col}', ex, f'{stat}{stem}', col, kind,
+               lambda f=test_fn, k=key: f()[k], srcs, f'{what}; {pairing}')
+
+
+# ---- tightness of the lag-augmented and the lag-free bound --------------------
+TIGHT_FIELDS = (
+    ('InitAug', 'aug_env_s0_ratio', 'lag-augmented bound at s_0'),
+    ('InitFree', 'free_env_s0_ratio', 'lag-free bound at s_0'),
+    ('AvgAug', 'aug_env_stepavg_ratio',
+     'lag-augmented bound averaged over the decision states s_0..s_{T-1}'),
+    ('AvgFree', 'free_env_stepavg_ratio',
+     'lag-free bound averaged over the decision states s_0..s_{T-1}'))
+
+
+def tight_rel(ds):
+    return f'test_results/PPVC/bound_tightness/bound_tightness_{ds}.json'
+
+
+def s5_cpu_rel(ds):
+    return f'test_results/PPVC/{ds}/byproducts_hstar/byproducts_greedy.json'
+
+
+@functools.lru_cache(maxsize=None)
+def tightness(ds):
+    """Per-order records of analysis_bound_tightness.py on one test set: the
+    SLAB policy of seed 301, greedy on the CPU, with both bounds recorded at
+    every state of the same trajectory. The schedules are asserted equal to
+    the CPU run of Section S5."""
+    where = tight_rel(ds)
+    d = read_json(os.path.join(REPO, where))
+    n = N_INST[ds]
+    check(d['dataset'] == ds and d['model'] == HSTAR_MODEL
+          and d['decoding'] == 'greedy' and d['device'] == 'cpu'
+          and int(d['seed_test']) == 50, f'{where}: header')
+    check(d['checkpoint_sha256'] == sha256_of(ckpt_rel(HSTAR_MODEL)),
+          f'{where}: checkpoint differs from {ckpt_rel(HSTAR_MODEL)}')
+    orders = d['orders']
+    check(int(d['n_orders']) == n and len(orders) == n,
+          f'{where}: {len(orders)} orders, expected {n}')
+    bp_rel = s5_cpu_rel(ds)
+    bp = read_json(os.path.join(REPO, bp_rel))
+    check(bp['dataset'] == ds and bp['model'] == HSTAR_MODEL
+          and len(bp['per_instance']) == n, f'{bp_rel}: header')
+    for i, r in enumerate(orders):
+        w = f'{where} order {i}'
+        check(r['instance'] == f'instance_{i:03d}'
+              and bp['per_instance'][i]['instance'] == r['instance'], f'{w}: name')
+        check(r['validator_feasible'] is True
+              and r['same_schedule_both_envs'] is True, f'{w}: schedule')
+        check(float(r['cmax']) == float(bp['per_instance'][i]['makespan']),
+              f'{w}: makespan differs from the CPU run of Section S5')
+        check(int(r['T']) > 0, f'{w}: no decision state')
+        # Proposition 1 at the terminal state, and the order of the bounds
+        check(r['aug_env_sT_equals_cmax'] is True
+              and r['free_env_sT_equals_cmax'] is True,
+              f'{w}: a bound at s_T differs from the makespan')
+        check(int(r['n_steps_free_gt_aug']) == 0
+              and int(r['n_steps_free_gt_aug_direct']) == 0,
+              f'{w}: lag-free bound above the lag-augmented bound')
+        check(int(r['free_env_n_above_cmax']) == 0,
+              f'{w}: lag-free bound above the makespan')
+        check(float(r['max_abs_env_minus_direct_h']) < 1e-6,
+              f'{w}: environment bound differs from its direct recomputation')
+    return tuple(orders)
+
+
+def tight_mean(ds, field):
+    return float(np.mean([float(r[field]) for r in tightness(ds)]))
+
+
+def tight_states(ds):
+    """Decision states s_0..s_T checked on one test set."""
+    return sum(int(r['T']) + 1 for r in tightness(ds))
+
+
+def tight_violations(ds):
+    """States at which the lag-augmented bound exceeds the makespan."""
+    return sum(int(r['aug_env_n_above_cmax']) for r in tightness(ds))
+
+
+def table_tightness():
+    ex = 'Bound tightness (supplement S4)'
+    for S, ds in SIZES:
+        for key, field, what in TIGHT_FIELDS:
+            define(f'BoundTight{key}{S}', ex, f'BoundTight{key}', S, 'share',
+                   lambda d=ds, f=field: tight_mean(d, f), tight_rel(ds),
+                   f'mean over the orders of the {what} divided by the '
+                   'makespan; SLAB seed 301, greedy, CPU (the schedules of '
+                   'Section S5, asserted)')
+
+
+# ---- single-shell orders ----------------------------------------------------
+SHELL_SETS = (  # key, dataset, generator mix, seed of the first order
+    ('RcTen', '10x25+ppvc-rc_project-ind', 'rc_project', 740000),
+    ('SteelTen', '10x25+ppvc-steel_project-ind', 'steel_project', 750000),
+    ('RcFifty', '50x25+ppvc-rc_project', 'rc_project', 760000),
+    ('SteelFifty', '50x25+ppvc-steel_project', 'steel_project', 770000))
+SHELL_RULES = ('FIFO', 'MOR', 'SPT', 'MWKR', 'SPTL', 'LLF', 'MWKRL', 'LRPTL')
+SHELL_SEED_PAT = 'greedy-s30{1,2,3}'
+
+
+def shell_seed(s):
+    return f'greedy-s{s}'
+
+
+def shell_rel(ds, method):
+    return f'test_results/PPVC/{ds}/shell_{method}.json'
+
+
+@functools.lru_cache(maxsize=None)
+def shell_meta(ds):
+    key = [k for k in SHELL_SETS if k[1] == ds]
+    check(len(key) == 1, f'{ds}: not a single-shell set')
+    _k, _d, mix, seed0 = key[0]
+    where = f'data/PPVC/{ds}/dataset_meta.json'
+    m = read_json(os.path.join(REPO, where))
+    n = N_INST[ds]
+    check(int(m['seed0']) == seed0 and int(m['n_instances']) == n
+          and int(m['n_modules']) == int(ds.split('x')[0])
+          and m['ppvc_mix'] == mix and m['ppvc_factory'] == 'default',
+          f'{where}: meta')
+    return m
+
+
+@functools.lru_cache(maxsize=None)
+def shell(ds, method):
+    """Per-order makespans of one method on one single-shell set
+    (eval_shell_projects.py), every schedule re-validated against the true
+    waits; the JSON is asserted equal to its shell_Result_*.npy file."""
+    shell_meta(ds)
+    where = shell_rel(ds, method)
+    d = read_json(os.path.join(REPO, where))
+    n = N_INST[ds]
+    check(d['dataset'] == ds and d['method'] == method and d['device'] == 'cpu'
+          and int(d['seed_test']) == 50 and d['all_validated'] is True
+          and int(d['n_instances']) == n and len(d['per_instance']) == n,
+          f'{where}: header')
+    if method.startswith('greedy-s'):
+        model = seed_model(int(method[len('greedy-s'):]))
+        check(d['model'] == model and d['decoding'] == 'greedy'
+              and d['checkpoint_sha256'] == sha256_of(ckpt_rel(model)),
+              f'{where}: model or checkpoint')
+    else:
+        check(method in SHELL_RULES and d['decoding'] == 'rule'
+              and d['model'] is None
+              and d['tie_break_seed'] == 'seed_test + order index',
+              f'{where}: rule header')
+    vals = []
+    for i, r in enumerate(d['per_instance']):
+        w = f'{where} order {i}'
+        check(r['instance'] == f'instance_{i:03d}', f'{w}: name')
+        check(r['validator_feasible'] is True
+              and int(r['validator_n_violations']) == 0
+              and float(r['validator_makespan']) == float(r['makespan']),
+              f'{w}: validator')
+        vals.append(float(r['makespan']))
+    col = np.array(vals)
+    npy = f'test_results/PPVC/{ds}/shell_Result_{method}_{ds}.npy'
+    path = guard(os.path.join(REPO, npy))
+    if not os.path.exists(path):
+        raise Missing(npy, 'file absent')
+    a = np.load(path, allow_pickle=False)
+    check(a.shape == (n, 2) and np.array_equal(a[:, 0], col),
+          f'{npy} differs from {where}')
+    check(bool(np.all(col > 0)), f'{where}: non-positive makespan')
+    col.setflags(write=False)
+    return col
+
+
+def shell_slab(ds):
+    """Per-order mean of the three SLAB seeds."""
+    return np.mean([shell(ds, shell_seed(s)) for s in SEEDS], axis=0)
+
+
+@functools.lru_cache(maxsize=None)
+def shell_test(ds, method):
+    """Paired test of one method (a seed, the seed mean or a rule) against
+    SPT on one single-shell set."""
+    a = shell_slab(ds) if method == 'mean' else shell(ds, method)
+    return paired_test(a, shell(ds, 'SPT'))
+
+
+def table_shell():
+    ex = 'Single-shell orders (supplement S1)'
+    for key, ds, _mix, _s0 in SHELL_SETS:
+        hs, sp = shell_rel(ds, SHELL_SEED_PAT), shell_rel(ds, 'SPT')
+        define(f'ShellSlab{key}', ex, 'ShellSlab', key, 'h',
+               lambda d=ds: float(np.mean([shell(d, shell_seed(s)).mean()
+                                           for s in SEEDS])), hs,
+               H_MEAN + ', SLAB greedy on the CPU')
+        define(f'ShellSpt{key}', ex, 'ShellSpt', key, 'h',
+               lambda d=ds: shell(d, 'SPT').mean(), sp,
+               ONE_MEAN + ' of the SPT rule (tie-break seed 50 + i)')
+        define(f'ShellGain{key}', ex, 'ShellGain', key, 'pct',
+               lambda k=key: -pct(shown(f'ShellSlab{k}'), shown(f'ShellSpt{k}')),
+               f'ShellSlab{key}, ShellSpt{key}',
+               '-100*(SLAB seed mean/SPT mean-1), from the one-decimal table '
+               'values: % by which SLAB is shorter than SPT')
+        define(f'ShellSeedWins{key}', ex, 'ShellSeedWins', key, 'int',
+               lambda d=ds: sum(1 for s in SEEDS
+                                if shell_test(d, shell_seed(s))['hi'] < 0),
+               f'{hs}, {sp}', 'SLAB seeds (of 3) shorter than SPT alone: '
+               'paired difference seed minus SPT with the upper end of its '
+               + BOOT_NOTE + ' below zero')
+
+
+# ---- CP-SAT time to reach the SLAB makespan ------------------------------------
+REACH_MODES = (('Cold', 'cold', 'cold start'),
+               ('Spt', 'warm-spt', 'started from the SPT schedule'))
+REACH_COLS = (('One', 1), ('Five', 5), ('Sixty', 60), ('Limit', None))
+REACH_LONG_S, REACH_LONG_N = 1800, 20
+
+
+def reach_time(rec, target, limit):
+    """First solver time (s) at which the incumbent (running minimum of the
+    logged trajectory; an SPT-started run logs its hint at t = 0) is at most
+    the target; a point logged after the limit counts at the limit; inf if
+    never reached."""
+    traj = rec.get('trajectory')
+    check(bool(traj), f'{rec["instance"]}: no trajectory')
+    pts = sorted((min(float(p[0]), float(limit)), float(p[1]))
+                 for p in traj if p[1] is not None)
+    check(abs(min(o for _t, o in pts) - float(rec['objective'])) < 1e-9,
+          f'{rec["instance"]}: trajectory minimum is not the objective')
+    best = math.inf
+    for t, o in pts:
+        best = min(best, o)
+        if best <= target + 1e-9:
+            return t
+    return math.inf
+
+
+@functools.lru_cache(maxsize=None)
+def reach_times(ds, mode, limit, n=None):
+    """Time to reach the per-order SLAB seed mean, one value per order."""
+    recs = (anytime(ds, mode, limit, mode) if n is None
+            else anytime(ds, mode, limit, mode, n=n))
+    tgt = inst_of(HSTAR, ds)[:len(recs)]
+    return tuple(reach_time(r, float(tgt[i]), limit) for i, r in enumerate(recs))
+
+
+def reach_count(ds, mode, limit, within, n=None):
+    return int(sum(1 for t in reach_times(ds, mode, limit, n) if t <= within))
+
+
+def reach_share(ds, mode, limit, within):
+    t = reach_times(ds, mode, limit, None)
+    return 100.0 * reach_count(ds, mode, limit, within) / len(t)
+
+
+def reach_median(ds, mode, limit):
+    """Median over all orders; inf when half or more never reach SLAB."""
+    return float(np.median(np.array(reach_times(ds, mode, limit, None))))
+
+
+def table_reach():
+    ex = 'CP-SAT time to reach SLAB (supplement S1)'
+    tgt = 'the per-order mean of the three SLAB seeds'
+    for S, ds in SIZES:
+        lim = cp_budget(S)
+        for M_, mode, what in REACH_MODES:
+            srcs = f'{any_rel(ds, mode, lim)}, {src(HSTAR, ds)}'
+            for C, c in REACH_COLS:
+                w = lim if c is None else c
+                define(f'CpReach{C}{M_}{S}', ex, f'CpReach{C}{M_}', S,
+                       'round_int',
+                       lambda d=ds, m=mode, l=lim, w=w: reach_share(d, m, l, w),
+                       srcs, f'% of orders on which CP-SAT ({what}, {lim} s, '
+                       f'4 workers) has an incumbent at or below {tgt} within '
+                       f'{w} s')
+            define(f'CpReachN{M_}{S}', ex, f'CpReachN{M_}', S, 'int',
+                   lambda d=ds, m=mode, l=lim: reach_count(d, m, l, l), srcs,
+                   f'orders on which CP-SAT ({what}, {lim} s) reaches {tgt} '
+                   'within its limit')
+            # the median is defined only when at least half of the orders
+            # reach SLAB; otherwise no macro is written (the table shows --)
+            try:
+                finite = math.isfinite(reach_median(ds, mode, lim))
+            except (Missing, AssertionError):
+                finite = True   # define() then records the pending source or the failure
+            if finite:
+                define(f'CpReachMed{M_}{S}', ex, f'CpReachMed{M_}', S, 's',
+                       lambda d=ds, m=mode, l=lim: reach_median(d, m, l), srcs,
+                       f'median over all orders of the first time (s) at which '
+                       f'CP-SAT ({what}, {lim} s) reaches {tgt}')
+    define('CpReachFiveTen', ex, 'scalars', 'CpReachFiveTen', 'round_int',
+           lambda: min(raw_of('CpReachFiveColdTen'), raw_of('CpReachFiveSptTen')),
+           'CpReachFive{Cold,Spt}Ten', 'smaller of the two starts: % of the '
+           f'10-module orders on which CP-SAT reaches {tgt} within 5 s')
+    for S in ('Twenty', 'Thirty'):
+        define(f'CpReachLimit{S}', ex, 'scalars', f'CpReachLimit{S}', 'round_int',
+               lambda S=S: max(raw_of(f'CpReachLimitCold{S}'),
+                               raw_of(f'CpReachLimitSpt{S}')),
+               f'CpReachLimit{{Cold,Spt}}{S}', 'larger of the two starts: % of '
+               f'the orders on which CP-SAT reaches {tgt} within 300 s')
+    define('CpReachFiftyEighty', ex, 'scalars', 'CpReachFiftyEighty', 'int',
+           lambda: sum(raw_of(f'CpReachN{M_}{S}') for S in ('Fifty', 'Eighty')
+                       for M_, _m, _w in REACH_MODES),
+           'CpReachN{Cold,Spt}{Fifty,Eighty}', 'orders on which CP-SAT reaches '
+           f'{tgt} within 600 s, summed over 50 and 80 modules and both starts '
+           '(of 200 runs)')
+    longs = [(ds, mode) for S, ds in SIZES if S in ('Fifty', 'Eighty')
+             for _M, mode, _w in REACH_MODES]
+    define('CpReachLongFiftyEighty', ex, 'scalars', 'CpReachLongFiftyEighty',
+           'int', lambda: sum(reach_count(d, m, REACH_LONG_S, REACH_LONG_S,
+                                          REACH_LONG_N) for d, m in longs),
+           ', '.join(any_rel(d, m, REACH_LONG_S) for d, m in longs),
+           f'orders on which CP-SAT given {REACH_LONG_S} s (first '
+           f'{REACH_LONG_N} orders) reaches {tgt}, summed over 50 and 80 modules '
+           'and both starts')
+    ds10 = SIZES[0][1]
+    for name, mode in (('CpEndMedTen', 'cold'), ('CpEndMedSptTen', 'warm-spt')):
+        define(name, ex, 'scalars', name, 's',
+               lambda m=mode: float(np.median([float(r['solve_elapsed_s'])
+                                               for r in anytime(ds10, m, 300, m)])),
+               any_rel(ds10, mode, 300), f'median solve time (solve_elapsed_s) '
+               f'of CP-SAT ({mode}, 300 s, 4 workers) over the 10-module orders')
+
+
+# ---- paired tests of Table VII (training orders) ---------------------------------
+TRAIN_RIVALS = (('LagFree', LAGFREE, 'the policy trained without waits'),
+                ('Full', FULL, 'the policy trained with full waits'),
+                ('FullAids', FULLAIDS, 'the policy trained with full waits and '
+                                       'both aids'),
+                ('TightNet', TIGHTNET, 'the policy trained with full waits and '
+                                       'both aids on the 15-station factory'))
+TRAIN_TPL = {R: tpl for R, tpl, _w in TRAIN_RIVALS}
+
+
+@functools.lru_cache(maxsize=None)
+def train_test(R, ds):
+    return paired_test(inst_of(HSTAR, ds), inst_of(TRAIN_TPL[R], ds))
+
+
+@functools.lru_cache(maxsize=None)
+def train_holm(R):
+    adj, _rej = holm([train_test(R, ds)['p'] for _S, ds in SIZES])
+    return tuple(float(x) for x in adj)
+
+
+def stats_train():
+    ex = 'Statistics of Table VII (supplement S2)'
+    for R, tpl, what in TRAIN_RIVALS:
+        for k, (S, ds) in enumerate(SIZES + (TIGHT,)):
+            define_tests(ex, f'Train{R}', S, lambda r=R, d=ds: train_test(r, d),
+                         f'{src(HSTAR, ds)}, {src(tpl, ds)}',
+                         f'SLAB per-order 3-seed mean vs {what}, per-order '
+                         '3-seed mean, paired by order')
+            if S == TIGHT[0]:
+                define(f'PvalTrain{R}Holm{S}', ex, f'PvalTrain{R}Holm', S, 'p',
+                       lambda r=R, d=ds: train_test(r, d)['p'],
+                       f'PvalTrain{R}{S}', 'the 15-station set is a family of '
+                       'one: the adjusted p equals the raw p')
+            else:
+                define(f'PvalTrain{R}Holm{S}', ex, f'PvalTrain{R}Holm', S, 'p',
+                       lambda r=R, i=k: train_holm(r)[i],
+                       f'PvalTrain{R}{{Ten..Eighty}}',
+                       'Holm-adjusted over the 5 default-factory sizes of this rival')
+
+
+# ---- paired tests of Table VIII (uncertain waits) ---------------------------------
+STOCH_RIVALS = (('Repair', 'slab_repair', 'SLAB with plan repair'),
+                ('Spt', 'spt_reactive', 'SPT re-planning'),
+                ('CpRepair', 'cpsat_repair', 'the CP-SAT plan with repair'),
+                ('CpRoll', 'cpsat_rolling', 'rolling CP-SAT'),
+                ('PerfInfo', 'slab_perfect_info',
+                 'SLAB with the waits known (reference)'))
+
+
+def stoch_rivals(S):
+    return [x for x in STOCH_RIVALS if S == 'Ten' or x[0] != 'CpRoll']
+
+
+def stoch_key(r):
+    return (int(r['instance_idx']), round(float(r['cv']), 3), int(r['rep']))
+
+
+@functools.lru_cache(maxsize=None)
+def stoch_test(S, method, cv):
+    """SLAB re-planning minus the rival, paired by (order, replication)
+    within one cv."""
+    stoch_consistency(S)
+    base = {stoch_key(r): float(r['realized_makespan'])
+            for r in stoch(S, 'slab_reactive')}
+    riv = {stoch_key(r): float(r['realized_makespan']) for r in stoch(S, method)}
+    check(set(riv) == set(base), f'{S} {method}: runs differ from SLAB re-planning')
+    keys = sorted(k for k in base if k[1] == cv)
+    check(len(keys) == STOCH[S][3] * len(REPS), f'{S} {method} cv {cv}: '
+                                                f'{len(keys)} pairs')
+    return paired_test([base[k] for k in keys], [riv[k] for k in keys])
+
+
+@functools.lru_cache(maxsize=None)
+def stoch_holm(S, method):
+    adj, _rej = holm([stoch_test(S, method, cv)['p'] for _n, cv in CVS])
+    return tuple(float(x) for x in adj)
+
+
+def stats_uncertain():
+    ex = 'Statistics of Table VIII (supplement S2)'
+    for S in ('Ten', 'Fifty'):
+        for R, method, what in stoch_rivals(S):
+            srcs = f'{stoch_rel(S, "slab_reactive")}, {stoch_rel(S, method)}'
+            for k, (cvn, cv) in enumerate(CVS):
+                define_tests(ex, f'Stoch{R}', f'{S}{cvn}',
+                             lambda s=S, m=method, c=cv: stoch_test(s, m, c),
+                             srcs, f'SLAB re-planning vs {what}, realized '
+                             f'makespan at cv {cv}, paired by order and '
+                             'replication')
+                define(f'PvalStoch{R}Holm{S}{cvn}', ex, f'PvalStoch{R}Holm',
+                       f'{S}{cvn}', 'p', lambda s=S, m=method, i=k: stoch_holm(s, m)[i],
+                       f'PvalStoch{R}{S}{{CvOne,CvTwo,CvThree}}',
+                       'Holm-adjusted over the 3 cv values of this rival at '
+                       'this size')
+
+
+# ---- paired tests of Table IX (disruptions); built only when enabled ----------------
+DIS_RIVALS = (('Llf', 'rule_llf_reactive', 'rules', 'LLF re-planning'),
+              ('SptRule', 'rule_spt_reactive', 'rules', 'SPT re-planning'),
+              ('Spt', 'spt_reactive', 'reactive', 'SPTL re-planning'),
+              ('Ga', 'ga_reactive', 'gafast', 'the GA, 5 s (fast decoder)'),
+              ('Rs', 'right_shift', 'reactive', 'the right-shift'),
+              ('ResFive', 'residual_cpsat_5s', 'resid', 'residual CP-SAT, 5 s'),
+              ('ResThirty', 'residual_cpsat_30s', 'resid',
+               'residual CP-SAT, 30 s'))
+
+
+def resid_rel(ds, dtype):
+    # re-solved on 2026-10-12 with one torch thread and --match_reactive, so
+    # every order starts from the SLAB state of the Table IX reactive file;
+    # replaces reactive_hstar_hint/residual_cpsat_<type>.npy (4-thread states)
+    return f'test_results/PPVC/{ds}/reactive_hstar_hint_fix/residual_cpsat_{dtype}.npy'
+
+
+@functools.lru_cache(maxsize=None)
+def resid_file(ds, dtype, n):
+    where = resid_rel(ds, dtype)
+    path = guard(os.path.join(REPO, where))
+    if not os.path.exists(path):
+        raise Missing(where, 'file absent')
+    d = np.load(path, allow_pickle=True).item()
+    meta = d['meta']
+    check(meta['model_name'] == HSTAR_MODEL and meta['dataset'] == ds
+          and meta['disruption_type'] == dtype and int(meta['n_instances']) == n
+          and int(meta['cpsat_workers']) == 2, f'{where}: meta')
+    for k, c in d['contention'].items():
+        check(c.get('n_low_share', 0) == 0 and c.get('n_no_evidence', 0) == 0,
+              f'{where}: contention {k}')
+    for k in ('residual_cpsat_5s', 'residual_cpsat_30s', 'drl_reactive'):
+        rec = d['records'][k]
+        check(len(rec['makespan']) == n and bool(np.all(rec['feasible']))
+              and bool(np.all(np.isfinite(np.asarray(rec['makespan'], float)))),
+              f'{where}: {k}')
+    for k in ('residual_cpsat_5s', 'residual_cpsat_30s'):
+        cs = d['contention'][k].get('cpu_share_min')
+        check(cs is None or float(cs) >= LOW_CPU_SHARE, f'{where}: {k} cpu_share {cs}')
+    # the run is matched to the Table IX reactive file: same standing plans,
+    # same disrupted states, same SLAB re-plans (one torch thread)
+    ref = dis_rel(ds, dtype)
+    check(meta.get('match_reactive') == ref
+          and int(meta.get('n_matched_reactive', -1)) == n
+          and int(meta.get('torch_threads', -1)) == 1
+          and meta.get('hint') == 'right_shift'
+          and int(meta.get('n_hint_failed', -1)) == 0
+          and int(meta['n_infeasible']) == 0
+          and int(meta['n_prefix_violations']) == 0
+          and int(meta['n_breakdown_window_violations']) == 0,
+          f'{where}: not a run matched to {ref}')
+    rea = reactive(ds, dtype, n)
+    check(np.array_equal(np.asarray(d['orig_makespans'], float),
+                         np.asarray(rea['orig_makespans'], float)),
+          f'{where}: standing plans differ from {ref}')
+    for f in ('makespan', 'mch_nerv', 'time_nerv', 'comb_nerv'):
+        check(np.array_equal(np.asarray(d['records']['drl_reactive'][f], float),
+                             np.asarray(rea['records']['drl_reactive'][f], float)),
+              f'{where}: SLAB re-plan {f} differs from {ref}')
+    return d
+
+
+@functools.lru_cache(maxsize=None)
+def dis_test(S, R, dtype):
+    """SLAB re-planning (the SLAB column of Table IX) minus the rival,
+    makespan, paired by order. The rule and residual files are asserted to
+    start from the same disrupted states with the same SLAB re-plans."""
+    ds, n = [(d, k) for s, d, k in DIS_SIZES if s == S][0]
+    key, where = [(k, w) for r, k, w, _x in DIS_RIVALS if r == R][0]
+    rea = reactive(ds, dtype, n)
+    if where == 'rules':
+        riv = rules_file(ds, dtype, n)
+    elif where == 'gafast':
+        riv = gafast_file(ds, dtype, n)
+    elif where == 'resid':
+        riv = resid_file(ds, dtype, n)
+    else:
+        riv = rea
+    return paired_test(rea['records']['drl_reactive']['makespan'],
+                       riv['records'][key]['makespan'])
+
+
+@functools.lru_cache(maxsize=None)
+def dis_holm(S, R):
+    adj, _rej = holm([dis_test(S, R, t)['p'] for _T, t in DIS_TYPES])
+    return tuple(float(x) for x in adj)
+
+
+def stats_disrupt():
+    if not DISRUPT_STATS:
+        return
+    ex = 'Statistics of Table IX (supplement S2)'
+    for S, ds, _n in DIS_SIZES:
+        for R, key, where, what in DIS_RIVALS:
+            for k, (T, t) in enumerate(DIS_TYPES):
+                srcs = {'reactive': dis_rel, 'rules': rules_rel,
+                        'gafast': gafast_rel, 'resid': resid_rel}[where](ds, t)
+                define_tests(ex, f'Dis{R}', f'{T}{S}',
+                             lambda s=S, r=R, t=t: dis_test(s, r, t), srcs,
+                             f'SLAB re-planning vs {what}, makespan after one '
+                             'disruption, paired by order (the SLAB column of '
+                             f'{dis_rel(ds, t)})')
+                define(f'PvalDis{R}Holm{T}{S}', ex, f'PvalDis{R}Holm', f'{T}{S}',
+                       'p', lambda s=S, r=R, i=k: dis_holm(s, r)[i],
+                       f'PvalDis{R}{{Lag..Can}}{S}',
+                       'Holm-adjusted over the 6 disruption types of this rival '
+                       'at this size')
+
+
+# ---- rule re-planners in the closed loop (Table IX LLF column, Section S8) --------
+RULE_ARMS = (('Llf', 'rule_llf_reactive', 'the LLF rule'),
+             ('SptRule', 'rule_spt_reactive', 'the SPT rule'))
+SAME_ARMS = ('drl_reactive', 'spt_reactive', 'right_shift')
+SAME_FIELDS = ('makespan', 'inflation', 'mch_nerv', 'time_nerv', 'comb_nerv',
+               'feasible')
+TYPE_PARAM = {'lag_perturb': ('lag_factor',), 'pt_deviation': ('pt_factor',),
+              'material_shortage': ('shortage_factor', 'shortage_basis')}
+
+
+TIE_TOL = 1e-6   # h; makespans closer than this count as equal (float noise)
+
+
+def count_shorter(a, b):
+    """Orders on which a is shorter than b by more than TIE_TOL."""
+    return int(np.sum(np.asarray(a, float) < np.asarray(b, float) - TIE_TOL))
+
+
+def rules_rel(ds, dtype):
+    return (f'test_results/PPVC/{ds}/reactive_hstar_rules/'
+            f'reactive_{dtype}_{HSTAR_MODEL}.npy')
+
+
+def check_arm(d, key, n, where):
+    rec = d['records'][key]
+    check(len(rec['makespan']) == n and bool(np.all(rec['feasible']))
+          and bool(np.all(np.isfinite(np.asarray(rec['makespan'], float)))),
+          f'{where}: {key} length or feasibility')
+    check(int(np.sum(rec['n_low_share'])) == 0
+          and int(np.sum(rec['n_no_evidence'])) == 0,
+          f'{where}: {key} contention')
+    cs = np.asarray(rec['cpu_share_min'], dtype=float)
+    cs = cs[np.isfinite(cs)]
+    check(cs.size == 0 or float(cs.min()) >= LOW_CPU_SHARE,
+          f'{where}: {key} cpu_share_min {cs.min() if cs.size else None}')
+
+
+def check_same_states(d, ref, where, ref_where, arms):
+    """Same standing plans, same disruptions and identical records of the
+    given arms (deterministic re-plans) in two eval_reactive files."""
+    check(np.array_equal(np.asarray(d['orig_makespans'], float),
+                         np.asarray(ref['orig_makespans'], float))
+          and list(d['info']) == list(ref['info']),
+          f'{where}: standing plans or disruptions differ from {ref_where}')
+    for a in arms:
+        for f in SAME_FIELDS:
+            check(np.array_equal(np.asarray(d['records'][a][f]),
+                                 np.asarray(ref['records'][a][f])),
+                  f'{where}: {a} {f} differs from {ref_where}')
+
+
+@functools.lru_cache(maxsize=None)
+def rules_file(ds, dtype, n):
+    """eval_reactive run with the SPT and LLF rules re-planning in the closed
+    loop on the Table IX states: its SLAB, SPTL and right-shift records are
+    asserted identical to those of the Table IX file."""
+    where = rules_rel(ds, dtype)
+    path = guard(os.path.join(REPO, where))
+    if not os.path.exists(path):
+        raise Missing(where, 'file absent')
+    d = np.load(path, allow_pickle=True).item()
+    meta = d['meta']
+    ref = dis_rel(ds, dtype)
+    rea = reactive(ds, dtype, n)
+    m0 = rea['meta']
+    check(meta['model_name'] == HSTAR_MODEL and meta['dataset'] == ds
+          and meta['disruption_type'] == dtype and int(meta['n_instances']) == n
+          and int(meta['n_infeasible']) == 0
+          and int(meta['n_contract_violations']) == 0
+          and int(meta['seed_test']) == int(m0['seed_test'])
+          and float(meta['disruption_offset']) == float(m0['disruption_offset']),
+          f'{where}: meta')
+    for k in TYPE_PARAM.get(dtype, ()):
+        check(meta[k] == m0[k], f'{where}: {k} differs from {ref}')
+    for key in SAME_ARMS + ('rule_spt_reactive', 'rule_llf_reactive'):
+        check_arm(d, key, n, where)
+    check_same_states(d, rea, where, ref, SAME_ARMS)
+    return d
+
+
+def rules_mean(ds, n, dtype, key, field='makespan'):
+    return float(np.mean(np.asarray(rules_file(ds, dtype, n)['records'][key][field],
+                                    dtype=float)))
+
+
+def slab_shorter(ds, n, dtype, key):
+    """Orders on which SLAB re-planning is shorter than the rule."""
+    d = rules_file(ds, dtype, n)['records']
+    return count_shorter(d['drl_reactive']['makespan'], d[key]['makespan'])
+
+
+def table_rules():
+    ex = 'Rule re-planners (Table IX, supplement S8)'
+    for S, ds, n in DIS_SIZES:
+        for T, t in DIS_TYPES:
+            for R, key, what in RULE_ARMS:
+                define(f'Dis{T}{R}{S}', ex, f'Dis{T}{R}', S, 'h',
+                       lambda d=ds, n=n, t=t, k=key: rules_mean(d, n, t, k),
+                       rules_rel(ds, t), f'mean realized makespan of {key} '
+                       f'({what} re-planning in the closed loop) over {n} '
+                       'instances (h); its SLAB, SPTL and right-shift records '
+                       f'equal those of {dis_rel(ds, t)} (asserted)')
+        allsrc = (f'test_results/PPVC/{ds}/reactive_hstar_rules/reactive_'
+                  '{lag_perturb,breakdown,urgent_arrival,material_shortage,'
+                  f'pt_deviation,cancellation}}_{HSTAR_MODEL}.npy')
+        for R, key, what in RULE_ARMS:
+            define(f'DisNerv{R}{S}', ex, f'DisNerv{R}', S, 'h',
+                   lambda d=ds, n=n, k=key: float(np.mean(
+                       [rules_mean(d, n, t, k, 'comb_nerv') for _T, t in DIS_TYPES])),
+                   allsrc, f'mean over the 6 types of the mean comb_nerv of {key} '
+                   '(operations, 1 decimal)')
+            define(f'DisTime{R}{S}', ex, f'DisTime{R}', S, 's',
+                   lambda d=ds, n=n, k=key: float(np.mean(
+                       [rules_mean(d, n, t, k, 'seconds') for _T, t in DIS_TYPES])),
+                   allsrc, f'mean over the 6 types of the mean re-planning seconds '
+                   f'of {key}')
+
+    def gaps(rules):
+        # per type: the better of the given rules minus SLAB, from the
+        # one-decimal table values
+        return [min(shown(f'Dis{T}{R}Fifty') for R in rules)
+                - shown(f'Dis{T}SlabFifty') for T, _t in DIS_TYPES]
+    for name, rules, what in (('', ('SptRule', 'Llf'),
+                               'the better (by mean) of the SPT and LLF rules'),
+                              ('Spt', ('SptRule',), 'the SPT rule'),
+                              ('Llf', ('Llf',), 'the LLF rule')):
+        src_ = ', '.join(f'Dis*{R}Fifty' for R in rules) + ', Dis*SlabFifty'
+        define(f'RuleGap{name}MinFifty', ex, 'scalars', f'RuleGap{name}MinFifty',
+               'h', lambda r=rules: min(gaps(r)), src_,
+               f'min over the 6 types of the mean makespan of {what} minus that '
+               'of SLAB re-planning, 50 modules, one-decimal table values (h)')
+        define(f'RuleGap{name}MaxFifty', ex, 'scalars', f'RuleGap{name}MaxFifty',
+               'h', lambda r=rules: max(gaps(r)), src_,
+               f'max over the 6 types of the mean makespan of {what} minus that '
+               'of SLAB re-planning, 50 modules, one-decimal table values (h)')
+    ds50, n50 = [(d, k) for s, d, k in DIS_SIZES if s == 'Fifty'][0]
+    define('RuleWinsFifty', ex, 'scalars', 'RuleWinsFifty', 'int',
+           lambda: min(slab_shorter(ds50, n50, t, k) for _T, t in DIS_TYPES
+                       for _R, k, _w in RULE_ARMS),
+           f'test_results/PPVC/{ds50}/reactive_hstar_rules/*.npy',
+           f'min over the 6 types and the SPT and LLF rules of the orders (of '
+           f'{n50}) on which SLAB re-planning is shorter than the rule')
+
+
+# ---- breakdown severity (Section S8) ------------------------------------------------
+SEVERITIES = (('Eight', 8), ('TwentyFour', 24))
+SEV_ARMS = (('Slab', 'drl_reactive', 'react'), ('Spt', 'spt_reactive', 'react'),
+            ('SptRule', 'rule_spt_reactive', 'react'),
+            ('Llf', 'rule_llf_reactive', 'react'), ('Ga', 'ga_reactive', 'react'),
+            ('Rs', 'right_shift', 'react'),
+            ('ResFive', 'residual_cpsat_5s', 'resid'),
+            ('ResThirty', 'residual_cpsat_30s', 'resid'))
+
+
+def sev_rel(ds, hours, kind):
+    sub = f'test_results/PPVC/{ds}/reactive_hstar_brk{hours}h/'
+    return sub + (f'reactive_breakdown_{HSTAR_MODEL}.npy' if kind == 'react'
+                  else 'residual_cpsat_breakdown.npy')
+
+
+@functools.lru_cache(maxsize=None)
+def sev_file(ds, hours, kind, n):
+    """A breakdown of the busiest station lasting `hours` h, on the Table IX
+    orders and offset: the eval_reactive run (SLAB, SPTL, SPT, LLF, GA,
+    right-shift) or the residual CP-SAT run, whose disrupted states are
+    asserted equal to those of the eval_reactive run (state fingerprints)."""
+    where = sev_rel(ds, hours, kind)
+    path = guard(os.path.join(REPO, where))
+    if not os.path.exists(path):
+        raise Missing(where, 'file absent')
+    d = np.load(path, allow_pickle=True).item()
+    meta = d['meta']
+    m0 = reactive(ds, 'breakdown', n)['meta']
+    check(meta['model_name'] == HSTAR_MODEL and meta['dataset'] == ds
+          and meta['disruption_type'] == 'breakdown'
+          and int(meta['n_instances']) == n
+          and float(meta['breakdown_hours']) == float(hours)
+          and int(meta['n_infeasible']) == 0
+          and int(meta['seed_test']) == int(m0['seed_test'])
+          and float(meta['disruption_offset']) == float(m0['disruption_offset']),
+          f'{where}: meta')
+    if kind == 'react':
+        check(int(meta['n_contract_violations']) == 0
+              and float(meta['ga_budget']) == float(m0['ga_budget'])
+              and int(meta['ga_pop']) == int(m0['ga_pop'])
+              and int(meta['ga_seed']) == int(m0['ga_seed']), f'{where}: GA or contract')
+        for _c, key, k in SEV_ARMS:
+            if k == 'react':
+                check_arm(d, key, n, where)
+        check(len(d['info']) == n
+              and all(f'down {hours:.2f}h' in s for s in d['info']),
+              f'{where}: outage is not {hours} h on every order')
+        check(np.array_equal(np.asarray(d['orig_makespans'], float),
+                             np.asarray(reactive(ds, 'breakdown', n)['orig_makespans'],
+                                        float)),
+              f'{where}: standing plans differ from the Table IX file')
+    else:
+        check(meta.get('state_checked_against_eval_reactive') is True
+              and int(meta['n_prefix_violations']) == 0
+              and int(meta['n_breakdown_window_violations']) == 0
+              and meta.get('hint') == 'right_shift'
+              and int(meta.get('n_hint_failed', -1)) == 0
+              and int(meta['cpsat_workers']) == 2, f'{where}: meta')
+        for _c, key, k in SEV_ARMS:
+            if k == 'resid':
+                check_arm(d, key, n, where)
+        r = sev_file(ds, hours, 'react', n)
+        check(list(d['state_fp']) == list(r['state_fp'])
+              and np.array_equal(np.asarray(d['orig_makespans'], float),
+                                 np.asarray(r['orig_makespans'], float)),
+              f'{where}: disrupted states differ from {sev_rel(ds, hours, "react")}')
+        for f in ('makespan', 'comb_nerv'):
+            check(np.array_equal(np.asarray(d['records']['drl_reactive'][f], float),
+                                 np.asarray(r['records']['drl_reactive'][f], float)),
+                  f'{where}: SLAB {f} differs from the eval_reactive run')
+    return d
+
+
+def sev_record(S, sev, code):
+    """Record of one method after a breakdown: 'Base' is the Table IX
+    severity (outage 0.5 x mean processing time; SPT and LLF from the rule
+    files, residual CP-SAT from the re-solved files), else 8 h or 24 h."""
+    ds, n = [(d, k) for s, d, k in DIS_SIZES if s == S][0]
+    key, kind = [(k, w) for c, k, w in SEV_ARMS if c == code][0]
+    if code == 'Ga':   # fast-decoder reruns on the same states
+        hours = None if sev == 'Base' else dict(SEVERITIES)[sev]
+        return gafast_file(ds, 'breakdown', n, hours)['records'][key]
+    if sev == 'Base':
+        if kind == 'resid':
+            return resid_file(ds, 'breakdown', n)['records'][key]
+        if key.startswith('rule_'):
+            return rules_file(ds, 'breakdown', n)['records'][key]
+        return reactive(ds, 'breakdown', n)['records'][key]
+    hours = dict(SEVERITIES)[sev]
+    return sev_file(ds, hours, kind, n)['records'][key]
+
+
+def sev_src(S, sev, code):
+    ds = [d for s, d, _k in DIS_SIZES if s == S][0]
+    key, kind = [(k, w) for c, k, w in SEV_ARMS if c == code][0]
+    if code == 'Ga':
+        return gafast_rel(ds, 'breakdown',
+                          None if sev == 'Base' else dict(SEVERITIES)[sev])
+    if sev == 'Base':
+        if kind == 'resid':
+            return resid_rel(ds, 'breakdown')
+        return rules_rel(ds, 'breakdown') if key.startswith('rule_') \
+            else dis_rel(ds, 'breakdown')
+    return sev_rel(ds, dict(SEVERITIES)[sev], kind)
+
+
+def sev_mean(S, sev, code, field='makespan'):
+    return float(np.mean(np.asarray(sev_record(S, sev, code)[field], dtype=float)))
+
+
+def sev_count(S, sev, a, b):
+    """Orders on which method a is shorter than method b (by more than
+    TIE_TOL: one 8-h order at 50 modules differs by 6e-14 h)."""
+    return count_shorter(sev_record(S, sev, a)['makespan'],
+                         sev_record(S, sev, b)['makespan'])
+
+
+def table_severity():
+    ex = 'Breakdown severity (supplement S8)'
+    for S, ds, n in DIS_SIZES:
+        for sev, hours in SEVERITIES:
+            for code, key, _k in SEV_ARMS:
+                define(f'Sev{code}{sev}{S}', ex, f'Sev{code}{sev}', S, 'h',
+                       lambda s=S, v=sev, c=code: sev_mean(s, v, c),
+                       sev_src(S, sev, code), f'mean makespan of {key} after a '
+                       f'{hours}-h breakdown of the busiest station, {n} orders (h)')
+        for sev in ('Base',) + tuple(v for v, _h in SEVERITIES):
+            for code, key, _k in SEV_ARMS:
+                define(f'SevNerv{code}{sev}{S}', ex, f'SevNerv{code}', f'{sev}{S}',
+                       'h', lambda s=S, v=sev, c=code: sev_mean(s, v, c, 'comb_nerv'),
+                       sev_src(S, sev, code), f'mean comb_nerv (changed operations) '
+                       f'of {key} after the breakdown ({sev}: Base = 0.5 x mean '
+                       'processing time, the Table IX states)')
+            srcs = f'{sev_src(S, sev, "Slab")}, {sev_src(S, sev, "ResThirty")}'
+            define(f'SevSlabShorter{sev}{S}', ex, 'SevSlabShorter', f'{sev}{S}', 'int',
+                   lambda s=S, v=sev: sev_count(s, v, 'Slab', 'ResThirty'), srcs,
+                   f'orders (of {n}) on which SLAB re-planning is shorter than '
+                   'residual CP-SAT 30 s after the breakdown')
+            define(f'SevCpShorter{sev}{S}', ex, 'SevCpShorter', f'{sev}{S}', 'int',
+                   lambda s=S, v=sev: sev_count(s, v, 'ResThirty', 'Slab'), srcs,
+                   f'orders (of {n}) on which residual CP-SAT 30 s is shorter than '
+                   'SLAB re-planning after the breakdown')
+    for sev, _h in SEVERITIES:
+        define(f'SevMargin{sev}Fifty', ex, 'scalars', f'SevMargin{sev}Fifty', 'h',
+               lambda v=sev: shown(f'SevResThirty{v}Fifty') - shown(f'SevSlab{v}Fifty'),
+               f'SevResThirty{sev}Fifty, SevSlab{sev}Fifty', 'residual CP-SAT 30 s '
+               'minus SLAB re-planning, 50 modules, one-decimal table values (h)')
+    # 50 modules: how much each method's mean grows from the Table IX outage
+    # (0.5 x mean processing time) to the 8-h / 24-h outage, and the GA's
+    # excess over SLAB at the same outage (one-decimal table values, h)
+    for sev, _h in SEVERITIES:
+        for name, code in (('Slab', 'Slab'), ('Ga', 'Ga'), ('Shift', 'Rs'),
+                           ('ResThirty', 'ResThirty')):
+            define(f'Sev{name}Loss{sev}Fifty', ex, 'scalars', f'Sev{name}Loss{sev}Fifty',
+                   'h', lambda c=code, v=sev: shown(f'Sev{c}{v}Fifty')
+                   - shown(f'DisBrk{c}Fifty'), f'Sev{code}{sev}Fifty, DisBrk{code}Fifty',
+                   f'mean makespan at the {sev} outage minus the mean at the Table IX '
+                   'outage, 50 modules (h)')
+        define(f'SevGaOverSlab{sev}Fifty', ex, 'scalars', f'SevGaOverSlab{sev}Fifty', 'h',
+               lambda v=sev: shown(f'SevGa{v}Fifty') - shown(f'SevSlab{v}Fifty'),
+               f'SevGa{sev}Fifty, SevSlab{sev}Fifty', 'GA (5 s, fast decoder) minus '
+               'SLAB re-planning at the same outage, 50 modules (h)')
+    for sev in ('Base',) + tuple(v for v, _h in SEVERITIES):
+        a, b = (('DisBrkSlabTen', 'DisBrkResThirtyTen') if sev == 'Base'
+                else (f'SevSlab{sev}Ten', f'SevResThirty{sev}Ten'))
+        define(f'SevCpLead{sev}Ten', ex, 'scalars', f'SevCpLead{sev}Ten', 'h',
+               lambda a=a, b=b: shown(a) - shown(b), f'{a}, {b}',
+               'SLAB re-planning minus residual CP-SAT 30 s, 10 modules, '
+               'one-decimal table values (h)')
+
+
+# ---- stability-aware residual CP-SAT at 50 modules (Section S8) -----------------------
+STAB50_DS, STAB50_N = '50x25+ppvc-mixed', 20
+STAB50_W = (0.0, 0.5, 1.0, 2.0)
+
+
+def stab50_rel(dtype):
+    return (f'test_results/PPVC/{STAB50_DS}/stability_50/'
+            f'stability_sweep_{dtype}.npy')
+
+
+@functools.lru_cache(maxsize=None)
+def stab50(dtype):
+    """Stability sweep at 50 modules: residual CP-SAT with a penalty of w h
+    per changed operation, hinted with the right-shifted plan, 30 s, 2
+    workers, on the Table IX states (asserted per order)."""
+    where = stab50_rel(dtype)
+    path = guard(os.path.join(REPO, where))
+    if not os.path.exists(path):
+        raise Missing(where, 'file absent')
+    d = np.load(path, allow_pickle=True).item()
+    n, m = STAB50_N, d['meta']
+    ref = dis_rel(STAB50_DS, dtype)
+    check(d['disruption_type'] == dtype and int(d['n']) == n
+          and int(d['budget']) == 30
+          and [float(w) for w in d['weights']] == list(STAB50_W), f'{where}: header')
+    check(m['dataset'] == STAB50_DS and m['model_name'] == HSTAR_MODEL
+          and float(m['offset']) == 0.4 and float(m['lag_factor']) == 2.0
+          and int(m['seed_test']) == 50 and int(m['cpsat_workers']) == 2
+          and m['stability_hint'] == 'right_shift' and int(m['n_hint_failed']) == 0
+          and int(m['n_matched_reactive']) == n and int(m['torch_threads']) == 1
+          and m['match_reactive'] == ref, f'{where}: meta')
+    for w in d['weights']:
+        c = d['contention'][w]
+        check(c['n_records'] == n and c['n_low_share'] == 0
+              and c['n_no_evidence'] == 0
+              and c.get('n_records_without_fields', 0) == 0
+              and (c.get('cpu_share_min') is None
+                   or float(c['cpu_share_min']) >= LOW_CPU_SHARE),
+              f'{where}: contention at w={w}')
+        fr = d['frontier'][w]
+        check(fr['feas'] == n and len(fr['infl']) == n and len(fr['nerv']) == n,
+              f'{where}: w={w} feasible')
+    check(d['drl']['feas'] == n, f'{where}: SLAB feasible')
+    rea = reactive(STAB50_DS, dtype, n)
+    po = d['per_order']
+    check(np.array_equal(np.asarray(po['drl_ms'], float),
+                         np.asarray(rea['records']['drl_reactive']['makespan'], float))
+          and np.array_equal(np.asarray(po['orig_ms'], float),
+                             np.asarray(rea['orig_makespans'], float))
+          and np.array_equal(np.asarray(d['drl']['nerv'], float),
+                             np.asarray(rea['records']['drl_reactive']['comb_nerv'],
+                                        float)),
+          f'{where}: SLAB records differ from {ref}')
+    return d
+
+
+def table_stab50():
+    ex = 'Stability-aware residual CP-SAT at 50 modules (supplement S8)'
+    for T, dtype in (('Lag', 'lag_perturb'), ('Brk', 'breakdown')):
+        s = stab50_rel(dtype)
+        define(f'StabInfl{T}Fifty', ex, 'scalars', f'StabInfl{T}Fifty', 'pct',
+               lambda t=dtype: float(np.mean(stab50(t)['frontier'][0.5]['infl'])), s,
+               'mean makespan increase over the standing plan (%), residual CP-SAT '
+               'w = 0.5 h per change, 30 s, hinted, 50 modules')
+        define(f'StabNerv{T}Fifty', ex, 'scalars', f'StabNerv{T}Fifty', 'h',
+               lambda t=dtype: float(np.mean(stab50(t)['frontier'][0.5]['nerv'])), s,
+               'mean changed operations, residual CP-SAT w = 0.5, 50 modules')
+        define(f'SlabInfl{T}Fifty', ex, 'scalars', f'SlabInfl{T}Fifty', 'pct',
+               lambda t=dtype: float(np.mean(stab50(t)['drl']['infl'])), s,
+               'mean makespan increase over the standing plan (%), SLAB re-planning, '
+               'same 20 disrupted orders')
+        define(f'SlabNerv{T}Fifty', ex, 'scalars', f'SlabNerv{T}Fifty', 'h',
+               lambda t=dtype: float(np.mean(stab50(t)['drl']['nerv'])), s,
+               'mean changed operations, SLAB re-planning, same orders')
+        define(f'StabMatch{T}Fifty', ex, 'scalars', f'StabMatch{T}Fifty', 'int',
+               lambda t=dtype: sum(
+                   1 for w in stab50(t)['weights']
+                   if np.mean(stab50(t)['frontier'][w]['infl'])
+                   <= np.mean(stab50(t)['drl']['infl'])), s,
+               'weights (of 4) at which the mean makespan increase of residual '
+               'CP-SAT is at most that of SLAB re-planning')
+
+
+
+# ---- disruption GA with the fast decoder (Table IX GA column, Section S8) -------------
+def gafast_rel(ds, dtype, hours=None):
+    sub = 'reactive_hstar_gafast' if hours is None else f'reactive_hstar_brk{hours}h_gafast'
+    return f'test_results/PPVC/{ds}/{sub}/reactive_{dtype}_{HSTAR_MODEL}.npy'
+
+
+@functools.lru_cache(maxsize=None)
+def gafast_file(ds, dtype, n, hours=None):
+    """The 5-s GA re-planner rerun with the fast decoder (2026-10-12) on the
+    disrupted states of Table IX (hours None) or of the 8-h / 24-h breakdown
+    runs. Asserted per order: the state fingerprint (Table IX: from the
+    re-solved residual file, whose states equal the reactive file's; 8 h /
+    24 h: from the reactive run), the standing plans, the disruptions and
+    every field of the SLAB record."""
+    where = gafast_rel(ds, dtype, hours)
+    path = guard(os.path.join(REPO, where))
+    if not os.path.exists(path):
+        raise Missing(where, 'file absent')
+    d = np.load(path, allow_pickle=True).item()
+    meta = d['meta']
+    if hours is None:
+        ref, ref_where = reactive(ds, dtype, n), dis_rel(ds, dtype)
+        ref_fp = resid_file(ds, dtype, n)['state_fp']
+        check('breakdown_hours' not in meta, f'{where}: outage')
+    else:
+        ref, ref_where = sev_file(ds, hours, 'react', n), sev_rel(ds, hours, 'react')
+        ref_fp = ref['state_fp']
+        check(float(meta['breakdown_hours']) == float(hours), f'{where}: outage')
+    m0 = ref['meta']
+    check(meta['model_name'] == HSTAR_MODEL and meta['dataset'] == ds
+          and meta['disruption_type'] == dtype and int(meta['n_instances']) == n
+          and meta.get('fast_eval') is True
+          and int(meta['n_infeasible']) == 0
+          and int(meta['n_contract_violations']) == 0
+          and float(meta['ga_budget']) == float(m0['ga_budget'])
+          and int(meta['ga_pop']) == int(m0['ga_pop'])
+          and int(meta['ga_seed']) == int(m0['ga_seed'])
+          and int(meta['seed_test']) == int(m0['seed_test'])
+          and float(meta['disruption_offset']) == float(m0['disruption_offset']),
+          f'{where}: meta')
+    for k in TYPE_PARAM.get(dtype, ()):
+        check(meta[k] == m0[k], f'{where}: {k} differs from {ref_where}')
+    for key in ('drl_reactive', 'ga_reactive'):
+        check_arm(d, key, n, where)
+    check(list(d['state_fp']) == list(ref_fp), f'{where}: state fingerprints differ')
+    check_same_states(d, ref, where, ref_where, ('drl_reactive',))
+    return d
+
+
+# ---- memetic algorithm: search statistics (Section S1) ---------------------------------
+def ma_pair(ds):
+    """Both variants start from the same rule seeds (same best seed per order)."""
+    check(np.array_equal(ma_field(ds, 'best_seed_makespan', 'pm1'),
+                         ma_field(ds, 'best_seed_makespan', 'pub')),
+          f'{ds}: the two memetic variants start from different seeds')
+    return True
+
+
+def table_memetic():
+    ex = 'Memetic algorithm (Table VI, supplement S1)'
+    for S, ds in SIZES:
+        n = N_INST[ds]
+        hs = src(HSTAR, ds)
+        for V, variant, what in (('', 'pm1', 'local search on every child'),
+                                 ('Pub', 'pub', 'published local-search rate 0.05')):
+            f = ma_rel(ds, 300, variant)
+            if V:
+                define(f'MaPub{S}', ex, 'MaPub', S, 'h',
+                       lambda d=ds: memetic(d, 300, 'pub').mean(), f,
+                       f'mean best_makespan of the memetic algorithm ({what}), 300 s')
+            define(f'Ma{V}Improved{S}', ex, f'Ma{V}Improved', S, 'int',
+                   lambda d=ds, v=variant: ma_pair(d) and int(np.sum(
+                       ma_field(d, 'best_makespan', v)
+                       < ma_field(d, 'best_seed_makespan', v) - TIE_TOL)), f,
+                   f'orders (of {n}) on which the memetic algorithm ({what}) ends '
+                   'below its best rule seed')
+            # (MaGain<Size> is taken by a stale line of macros_pending.tex)
+            define(f'Ma{V}SeedGain{S}', ex, f'Ma{V}SeedGain', S, 'h',
+                   lambda d=ds, v=variant: float(np.mean(
+                       ma_field(d, 'best_seed_makespan', v)
+                       - ma_field(d, 'best_makespan', v))), f,
+                   f'mean over the orders of best seed minus final makespan ({what}, h)')
+            define(f'Ma{V}Gens{S}', ex, f'Ma{V}Gens', S, 'round_int_sep',
+                   lambda d=ds, v=variant: float(np.median(ma_field(d, 'generations', v))),
+                   f, f'median generations (iterations) per order ({what})')
+            for stop, label in (('budget', 'Budget'), ('max_gens', 'Cap')):
+                define(f'Ma{V}{label}Stop{S}', ex, f'Ma{V}{label}Stop', S, 'int',
+                       lambda d=ds, v=variant, st=stop: sum(
+                           1 for r in memetic_file(d, 300, v)['instances']
+                           if r['status'] == st), f,
+                       f'orders whose search ({what}) ended by '
+                       + ('the 300-s budget' if stop == 'budget'
+                          else f'the iteration cap of {MA_MNI:,}'))
+        if S == 'Ten':
+            define('HstarVsMaLossTen', ex, 'scalars', 'HstarVsMaLossTen', 'pct',
+                   lambda: pct(shown('HstarTen'), shown('MaTen')), 'HstarTen, MaTen',
+                   '100*(SLAB 3-seed mean / memetic mean (local search on every child) '
+                   '- 1), 10 modules, one-decimal values: % by which SLAB is longer')
+        define(f'MaSlabWins{S}', ex, 'MaSlabWins', S, 'int',
+               lambda d=ds: count_shorter(inst_of(HSTAR, d), memetic(d)),
+               f'{hs}, {ma_rel(ds)}', f'orders (of {n}) on which the per-order '
+               'SLAB 3-seed mean is shorter than the memetic algorithm with local '
+               'search on every child')
+
+
+# ---- CP-SAT with 16 workers (80 modules, first 20 orders, from SPT, 600 s) -------------
+CP16_DS, CP16_N, CP16_T = '80x25+ppvc-mixed', 20, 600
+
+
+def cp16_recs():
+    return anytime(CP16_DS, 'warm-spt', CP16_T, 'warm-spt', n=CP16_N, workers=16)
+
+
+def table_cp_sixteen():
+    ex = 'CP-SAT with 16 workers (supplement S1)'
+    f16 = any_rel(CP16_DS, 'warm-spt', CP16_T, 16)
+    define('CpSixteenEighty', ex, 'scalars', 'CpSixteenEighty', 'h',
+           lambda: float(np.mean([float(r['objective']) for r in cp16_recs()])), f16,
+           f'mean objective, CP-SAT from SPT, {CP16_T} s, 16 workers, first '
+           f'{CP16_N} orders of {CP16_DS}')
+    define('CpFourSameEighty', ex, 'scalars', 'CpFourSameEighty', 'h',
+           lambda: float(np.mean(cp_col(CP16_DS, 'Eighty', 'warm-spt')[:CP16_N])),
+           cp_src(CP16_DS, 'Eighty', 'warm-spt'),
+           f'mean objective, CP-SAT from SPT, {CP16_T} s, 4 workers, on the same '
+           f'first {CP16_N} orders')
+    define('CpSixteenGapEighty', ex, 'scalars', 'CpSixteenGapEighty', 'pct',
+           lambda: pct(shown('CpSixteenEighty'), shown('LongSlabEighty')),
+           'CpSixteenEighty, LongSlabEighty', '100*(CP-SAT 16 workers / SLAB '
+           '3-seed mean - 1) on the first 20 orders, one-decimal values')
+    define('CpSixteenWinsEighty', ex, 'scalars', 'CpSixteenWinsEighty', 'int',
+           lambda: count_shorter(inst_of(HSTAR, CP16_DS)[:CP16_N],
+                                 [float(r['objective']) for r in cp16_recs()]),
+           f'{f16}, {src(HSTAR, CP16_DS)}', 'orders (of 20) on which the per-order '
+           'SLAB 3-seed mean is shorter than CP-SAT with 16 workers')
+    define('CpSixteenMinShareEighty', ex, 'scalars', 'CpSixteenMinShareEighty',
+           'share', lambda: math.floor(100 * min(float(r['cpu_share'])
+                                                 for r in cp16_recs())) / 100, f16,
+           'minimum cpu_share of the 16-worker runs, rounded down')
+
+
+
+# ---- batch of 2026-10-12 evening: derived prose numbers --------------------------------
+def cost_table():
+    path = os.environ.get('COST_TABLE', 'paper_inputs/cost_table_v3.json')
+    if not os.path.exists(path):
+        raise Missing(path, 'file absent')
+    return read_json(path), path
+
+
+def batch4_extras():
+    ex = 'Derived (prose, 2026-10-12 evening)'
+    for S in ('Fifty', 'Eighty'):
+        define(f'SlabVsFlowCp{S}', ex, 'scalars', f'SlabVsFlowCp{S}', 'pct',
+               lambda S=S: -pct(shown(f'Hstar{S}'), shown(f'FlowCpLine{S}')),
+               f'Hstar{S}, FlowCpLine{S}', '-100*(SLAB 3-seed mean / CP-SAT on the '
+               'flow-line restriction - 1), one-decimal values: % by which SLAB is shorter')
+        define(f'FullAidsVsHalf{S}', ex, 'scalars', f'FullAidsVsHalf{S}', 'pct',
+               lambda S=S: pct(shown(f'TrainFullAids{S}'), shown(f'TrainHalf{S}')),
+               f'TrainFullAids{S}, TrainHalf{S}', '100*(DANIEL trained with full waits '
+               'and both aids / SLAB - 1), 3-seed means, one-decimal values: % by which '
+               'the full-waits-with-aids policy is longer')
+
+    def params(key):
+        d, _p = cost_table()
+        st = d['static'][HSTAR_MODEL]
+        check(int(st['params_total']) - int(st['params_critic'])
+              == int(st['params_without_critic'])
+              and int(st['params_total']) == int(d['cpu'][HSTAR_MODEL]['_params_module']),
+              'cost table: parameter counts inconsistent')
+        return int(st[key])
+    define('ParamsActorDaniel', ex, 'scalars', 'ParamsActorDaniel', 'round_int_sep',
+           lambda: params('params_without_critic'),
+           os.environ.get('COST_TABLE', 'paper_inputs/cost_table_v3.json'),
+           f'static[{HSTAR_MODEL}].params_without_critic: parameters of the SLAB '
+           'network without the critic (params_total - params_critic asserted)')
+
+    def lat_n():
+        d, _p = cost_table()
+        ns = {int(d['cpu'][HSTAR_MODEL][s]['n_instances'])
+              for s in ('10x25', '20x25', '30x25', '50x25', '80x25')}
+        check(len(ns) == 1, f'latency runs use different order counts {ns}')
+        return ns.pop()
+    define('LatSlabN', ex, 'scalars', 'LatSlabN', 'int', lat_n,
+           os.environ.get('COST_TABLE', 'paper_inputs/cost_table_v3.json'),
+           'orders per size in the CPU latency measurement (cpu.<model>.<size>.n_instances, '
+           'equal at all five sizes)')
+    define('TrainGpuHoursSeeds', ex, 'scalars', 'TrainGpuHoursSeeds', 'h',
+           lambda: 3 * shown('TrainGpuHours'), 'TrainGpuHours (= TrainSecPerUpdate x 2000 / 3600)',
+           '3 seeds x the one-decimal GPU-hours of one seed (3 x 2.8); the unrounded '
+           'TrainSecPerUpdate x 2000 x 3 / 3600 is 8.47 h')
+
+
+# ---- single-shell orders: memetic algorithm and CP-SAT on the first 20 orders -----------
+SHELL50 = (('Rc', '50x25+ppvc-rc_project'), ('Steel', '50x25+ppvc-steel_project'))
+SHELL_SEARCH_N, SHELL_CP_T, SHELL_CP_PARTS = 20, 600, (0, 10)
+
+
+def shell_cp_rel(ds):
+    return (f'or_solution/PPVC/anytime/{ds}_warm-spt_{SHELL_CP_T}s_w4.part'
+            '{' + ','.join(str(k) for k in SHELL_CP_PARTS) + '}.jsonl')
+
+
+@functools.lru_cache(maxsize=None)
+def anytime_parts(ds, file_mode, t, rec_mode, parts, n, workers=4):
+    """Records of an anytime CP-SAT run written as part files
+    <ds>_<mode>_<t>s_w<workers>.part<k>.jsonl, ordered by instance id, with
+    the checks of anytime(): header, one record per order 0..n-1, a solution,
+    validator feasibility, cpu_share >= 0.9 for every run longer than 10 s."""
+    by = {}
+    for k in parts:
+        path = os.path.join(AT, f'{ds}_{file_mode}_{t}s_w{workers}.part{k}.jsonl')
+        for r in read_jsonl(path):
+            i = int(r['instance_id'])
+            where = f'{rel(path)} instance {i}'
+            check(r['dataset'] == ds and r['mode'] == rec_mode
+                  and float(r['time_limit_s']) == float(t), f'{where}: header')
+            check(r['instance'] == f'instance_{i:03d}', f'{where}: name')
+            check(int(r.get('num_workers', workers)) == workers, f'{where}: workers')
+            check(i not in by, f'{where}: duplicate record')
+            by[i] = (r, where)
+    if len(by) < n:
+        raise Missing(shell_cp_rel(ds) if file_mode == 'warm-spt' else ds,
+                      f'{len(by)} of {n} instances')
+    check(set(by) == set(range(n)), f'{ds}: instance ids not 0..{n - 1}')
+    for i in range(n):
+        r, where = by[i]
+        check(r['objective'] is not None, f'{where}: no solution')
+        if 'validator_feasible' in r:
+            check(r['validator_feasible'] is True, f'{where}: validator')
+        if float(r['solve_elapsed_s']) > ANYTIME_TIMED_S:
+            check('cpu_share' in r and float(r['cpu_share']) >= LOW_CPU_SHARE,
+                  f'{where}: cpu_share {r.get("cpu_share")}')
+    return tuple(by[i][0] for i in range(n))
+
+
+def shell_cp_col(ds):
+    return np.array([float(r['objective']) for r in anytime_parts(
+        ds, 'warm-spt', SHELL_CP_T, 'warm-spt', SHELL_CP_PARTS, SHELL_SEARCH_N)])
+
+
+def shell_ma_col(ds):
+    return memetic(ds, 300, 'pm1', SHELL_SEARCH_N)
+
+
+def table_shell_search():
+    ex = 'Single-shell orders, search methods (supplement S1)'
+    n = SHELL_SEARCH_N
+    for K, ds in SHELL50:
+        fma, fcp = ma_rel(ds), shell_cp_rel(ds)
+        hs, sp = shell_rel(ds, SHELL_SEED_PAT), shell_rel(ds, 'SPT')
+        define(f'ShellMa{K}Fifty', ex, 'ShellMa', K, 'h',
+               lambda d=ds: shell_ma_col(d).mean(), fma,
+               f'mean best_makespan of the memetic algorithm (local search on every '
+               f'child, 300 s), first {n} orders')
+        define(f'ShellCp{K}Fifty', ex, 'ShellCp', K, 'h',
+               lambda d=ds: shell_cp_col(d).mean(), fcp,
+               f'mean objective, CP-SAT from SPT, {SHELL_CP_T} s, 4 workers, first {n} orders')
+        define(f'ShellSlabTwenty{K}Fifty', ex, 'ShellSlabTwenty', K, 'h',
+               lambda d=ds: float(np.mean(shell_slab(d)[:n])), hs,
+               f'mean over the first {n} orders of the per-order SLAB 3-seed mean (h)')
+        define(f'ShellSptTwenty{K}Fifty', ex, 'ShellSptTwenty', K, 'h',
+               lambda d=ds: float(np.mean(shell(d, 'SPT')[:n])), sp,
+               f'mean makespan of the SPT rule on the first {n} orders (h)')
+        for R, what in (('Ma', 'the memetic algorithm'), ('Cp', 'CP-SAT from SPT')):
+            define(f'ShellSlabVs{R}{K}Fifty', ex, f'ShellSlabVs{R}', K, 'pct',
+                   lambda R=R, K=K: -pct(shown(f'ShellSlabTwenty{K}Fifty'),
+                                         shown(f'Shell{R}{K}Fifty')),
+                   f'ShellSlabTwenty{K}Fifty, Shell{R}{K}Fifty',
+                   f'-100*(SLAB / {what} - 1), first {n} orders, one-decimal values: '
+                   '% by which SLAB is shorter')
+        for R, fn, f, what in (
+                ('Ma', shell_ma_col, fma, 'the memetic algorithm'),
+                ('Cp', shell_cp_col, fcp, 'CP-SAT from SPT'),
+                ('Spt', lambda d: shell(d, 'SPT')[:n], sp, 'the SPT rule')):
+            define(f'ShellSlabWins{R}{K}Fifty', ex, f'ShellSlabWins{R}', K, 'int',
+                   lambda d=ds, fn=fn: count_shorter(shell_slab(d)[:n], fn(d)),
+                   f'{hs}, {f}', f'orders (of the first {n}) on which the per-order SLAB '
+                   f'3-seed mean is shorter than {what}')
+
+
+    def cp_lead_steel():
+        v = pct(shown('ShellSlabTwentySteelFifty'), shown('ShellCpSteelFifty'))
+        check(v > 0, 'CP-SAT is not shorter than SLAB on the steel orders; '
+                     'reword the single-shell paragraph of Section S1.6')
+        return v
+    define('ShellCpLeadSteelFifty', ex, 'ShellCpLead', 'Steel', 'pct', cp_lead_steel,
+           'ShellSlabTwentySteelFifty, ShellCpSteelFifty',
+           f'100*(SLAB / CP-SAT from SPT - 1), first {n} orders of the steel set, '
+           'one-decimal values: % by which CP-SAT from SPT is shorter than SLAB')
+
+
+
+def revision_batch():
+    table_tightness()
+    table_shell()
+    table_reach()
+    stats_train()
+    stats_uncertain()
+    stats_disrupt()
+    table_rules()
+    table_severity()
+    table_stab50()
+    table_memetic()
+    table_cp_sixteen()
+    batch4_extras()
+    table_shell_search()
+
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--strict', action='store_true',
@@ -1616,7 +2965,8 @@ def main(argv=None):
         check_data_counts()
     except AssertionError as err:
         FAILS.append(('data', str(err)))
-    for build in (table2, table3, table4, table5, table6, table7, stats, extras):
+    for build in (table2, table3, table4, table5, table6, table7, stats, extras,
+                  revision_batch):
         build()
     checks = self_checks()
     coll = collisions(args.out_dir)

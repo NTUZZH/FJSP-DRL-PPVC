@@ -1,0 +1,229 @@
+{
+ "method": "memetic (Caumond, Lacomme, Tchernev 2008), flexible-shop adaptation",
+ "dataset": "50x25+ppvc-steel_project",
+ "route_variant": "fixed",
+ "n_instances": 1,
+ "budget_s": 300.0,
+ "budget_includes_seeding": false,
+ "max_gens": 1000000,
+ "seed": 0,
+ "seed_test": 50,
+ "params": {
+  "nc": 50,
+  "n1": 14,
+  "np": 20000,
+  "pm": 1.0,
+  "mni": 1000000,
+  "nm": 10,
+  "pr": 0.5,
+  "mark_K": 49999,
+  "rules": [
+   "FIFO",
+   "MOR",
+   "SPT",
+   "MWKR",
+   "SPTL",
+   "LLF",
+   "MWKRL",
+   "LRPTL"
+  ]
+ },
+ "fast_eval": true,
+ "numba": "0.68.0",
+ "instance_range": [
+  17,
+  18
+ ],
+ "instances": [
+  {
+   "instance": "instance_017",
+   "best_makespan": 573.0,
+   "best_seed_makespan": 581.0,
+   "spt_makespan": 581.0,
+   "generations": 63911,
+   "ls_calls": 63911,
+   "ls_improvements": 159452,
+   "restarts": 3,
+   "clones_rejected": 596,
+   "iter_to_best": 1687,
+   "time_to_best_s": 34.743,
+   "seed_s": 27.296,
+   "search_s": 300.0,
+   "total_s": 327.296,
+   "s_per_generation": 0.0046940281059467005,
+   "n_seeds": 14,
+   "validator_violations": 0,
+   "seeds": [
+    {
+     "rule": "FIFO",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 781.0,
+     "decoded_makespan": 781.0
+    },
+    {
+     "rule": "MOR",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 1053.0,
+     "decoded_makespan": 1053.0
+    },
+    {
+     "rule": "SPT",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 581.0,
+     "decoded_makespan": 581.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 712.0,
+     "decoded_makespan": 712.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 594.0,
+     "decoded_makespan": 594.0
+    },
+    {
+     "rule": "LLF",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 581.0,
+     "decoded_makespan": 581.0
+    },
+    {
+     "rule": "MWKRL",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 721.0,
+     "decoded_makespan": 721.0
+    },
+    {
+     "rule": "LRPTL",
+     "round": 0,
+     "tie_seed": 67,
+     "env_makespan": 690.0,
+     "decoded_makespan": 690.0
+    },
+    {
+     "rule": "FIFO",
+     "round": 1,
+     "tie_seed": 7936,
+     "env_makespan": 767.0,
+     "decoded_makespan": 767.0
+    },
+    {
+     "rule": "MOR",
+     "round": 1,
+     "tie_seed": 7936,
+     "env_makespan": 794.0,
+     "decoded_makespan": 794.0
+    },
+    {
+     "rule": "SPT",
+     "round": 1,
+     "tie_seed": 7936,
+     "env_makespan": 585.0,
+     "decoded_makespan": 585.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 1,
+     "tie_seed": 7936,
+     "env_makespan": 703.0,
+     "decoded_makespan": 703.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 1,
+     "tie_seed": 7936,
+     "env_makespan": 613.0,
+     "decoded_makespan": 613.0
+    },
+    {
+     "rule": "LLF",
+     "round": 1,
+     "tie_seed": 7936,
+     "env_makespan": 582.0,
+     "decoded_makespan": 582.0
+    }
+   ],
+   "improvement_trace": [
+    [
+     0,
+     27.34,
+     581.0
+    ],
+    [
+     851,
+     29.996,
+     579.0
+    ],
+    [
+     888,
+     30.21,
+     578.0
+    ],
+    [
+     1002,
+     30.824,
+     577.0
+    ],
+    [
+     1037,
+     31.037,
+     576.0
+    ],
+    [
+     1115,
+     31.514,
+     575.0
+    ],
+    [
+     1642,
+     34.488,
+     574.0
+    ],
+    [
+     1687,
+     34.743,
+     573.0
+    ]
+   ],
+   "solve_wall_s": 300.0001,
+   "solve_cpu_s": 299.988,
+   "workers": 1,
+   "cpu_share": 1.0,
+   "status": "budget",
+   "time_limit_s": 300.0,
+   "hit_limit": true,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    13
+   ],
+   "loadavg_start": [
+    26.9,
+    29.36,
+    29.9
+   ]
+  }
+ ],
+ "contention": {
+  "n_records": 1,
+  "n_records_without_fields": 0,
+  "n_timed_solves": 1,
+  "n_hit_limit": 1,
+  "n_low_share": 0,
+  "n_no_evidence": 0,
+  "cpu_share_min": 1.0
+ }
+}

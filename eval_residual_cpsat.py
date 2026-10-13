@@ -63,12 +63,35 @@ CLI (matches eval_reactive defaults)
       [--shortage_factor 0.5] [--shortage_basis op_mean|remaining_work]
       [--cpsat_budgets 1,5,30] [--cpsat_workers 0] [--seed_test 50]
       [--max_instances N] [--out_dir DIR] [--hint none|right_shift]
+      [--breakdown_hours H] [--state_fp]
+      [--stability_sweep [--stability_weights ...] [--stability_budget s]
+                         [--stability_hint none|right_shift]]
   --disruption_type also takes a comma list of single types.
+  --breakdown_hours H sets the breakdown outage to H hours (default None =
+  0.5 x the mean processing time, as before); eval_reactive.py takes the same
+  option and builds the same outage. With H given, every breakdown state built
+  by the replicated legacy branch below is asserted to equal the state of
+  eval_reactive.build_disrupted_state (state_fingerprint), in this process.
+  --state_fp stores the per-instance state fingerprints in the npy, for the
+  cross-run check against eval_reactive.py --state_fp (same TORCH_THREADS).
+  --match_reactive FILE asserts, order by order, that this run rolls SLAB
+  exactly as the eval_reactive.py run that wrote FILE (its
+  reactive_<type>_<model>.npy for the same data, type and options): the
+  original plan's makespan, the disruption info string, SLAB's re-planned
+  makespan and change counts and, when FILE carries state_fp, the state
+  fingerprint must all be equal, or the run stops. eval_reactive.py rolls the
+  policy with torch.set_num_threads(1) (TORCH_THREADS default 1); this
+  script's default is 4 threads, which changes a few near-tie greedy
+  decisions, so a matching run needs TORCH_THREADS=1.
+  --stability_hint right_shift starts every penalized solve of the stability
+  sweep from the right-shift plan, built exactly as the --hint right_shift
+  main run builds it (the hint also sets the penalty variables of that plan).
+  Default none: the sweep starts cold, as before.
   --hint right_shift starts every residual CP-SAT solve from the right-shift
   plan of the same instance (retimed to the integer model; see
   right_shift_hint); the records then carry hint_given, hint_exact_rs,
   rs_makespan, hint_makespan, cpsat_makespan, above_rs and above_hint. The
-  stability sweep ignores --hint.
+  stability sweep ignores --hint (it takes --stability_hint instead).
 
 For lag_perturb and breakdown this script keeps its own REPLICATED copy of the
 disruption logic of eval_reactive.py (written when eval_reactive parsed its CLI
@@ -157,6 +180,21 @@ def parse_cli():
                          'w=0 is the makespan-only residual')
     ap.add_argument('--stability_budget', type=int, default=30,
                     help='per-solve CP-SAT budget (s) for the sweep')
+    ap.add_argument('--stability_hint', type=str, default='none',
+                    choices=['none', 'right_shift'],
+                    help='right_shift: start every solve of the stability '
+                         'sweep from the right-shift plan (as --hint '
+                         'right_shift does in the main run); none = cold')
+    ap.add_argument('--breakdown_hours', type=float, default=None,
+                    help='breakdown: outage length in hours (default None = '
+                         '0.5 x the mean processing time of the order)')
+    ap.add_argument('--state_fp', action='store_true',
+                    help='store the per-instance fingerprint of the disrupted '
+                         'state (eval_reactive.state_fingerprint) in the npy')
+    ap.add_argument('--match_reactive', type=str, default=None,
+                    help='eval_reactive npy of the same data/type/options; '
+                         'assert per order that the original plan, the '
+                         'disruption and SLAB re-planning are identical')
     args = ap.parse_args()
     if getattr(args, 'cpsat_workers', 1) == 0:
         # 0 would start one CP-SAT worker per machine core whatever the affinity mask;
@@ -332,9 +370,12 @@ def _import_eval_reactive():
 
 
 def _dparams(args):
-    return {'lag_factor': args.lag_factor, 'pt_factor': args.pt_factor,
-            'shortage_factor': args.shortage_factor,
-            'shortage_basis': args.shortage_basis}
+    dp = {'lag_factor': args.lag_factor, 'pt_factor': args.pt_factor,
+          'shortage_factor': args.shortage_factor,
+          'shortage_basis': args.shortage_basis}
+    if getattr(args, 'breakdown_hours', None) is not None:
+        dp['breakdown_hours'] = float(args.breakdown_hours)
+    return dp
 
 
 def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
@@ -442,7 +483,11 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
     elif disruption_type == 'breakdown':
         m = _pick_breakdown_machine(env)
         mean_pt_true = float(pt[pt > 0].mean())
-        downtime_true = 0.5 * mean_pt_true
+        breakdown_hours = (dparams or {}).get('breakdown_hours')
+        if breakdown_hours is None:
+            downtime_true = 0.5 * mean_pt_true
+        else:
+            downtime_true = float(breakdown_hours)
         downtime_norm = downtime_true / slope
         release_true = t_disrupt_true + downtime_true
         if m is None:
@@ -503,6 +548,62 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
                         else mch_ready_time.copy()),
         'new_ops': [], 'legacy': True,
     }, env, env.state
+
+
+def assert_same_state_as_reactive(ppo, jl, pt, meta, use_lag_features,
+                                  use_type_embedding, disruption_type, args,
+                                  stem, disrupt, env):
+    """Assert that this script's disrupted state equals the state
+    eval_reactive.build_disrupted_state builds from the same order and options
+    (state_fingerprint, env included; call before any arm steps env).
+    Returns the fingerprint."""
+    ER = _import_eval_reactive()
+    dp = dict(_dparams(args))
+    dp['lag_factor'] = args.lag_factor
+    ds_er = ER.build_disrupted_state(
+        ppo, jl, pt, meta, use_lag_features, use_type_embedding,
+        disruption_type, args.disruption_offset, dp,
+        ER.instance_context(stem, meta))
+    fp_er = ER.state_fingerprint(ds_er, ds_er['env'])
+    fp = ER.state_fingerprint(disrupt, env)
+    assert fp == fp_er, (f'{os.path.basename(stem)}: disrupted state differs '
+                         f'from eval_reactive.build_disrupted_state '
+                         f'({disrupt["info"]} vs {ds_er["info"]})')
+    return fp
+
+
+class ReactiveMatch:
+    """Per-order identity check against an eval_reactive.py result file."""
+
+    def __init__(self, path, disruption_type, dataset, model_name):
+        d = np.load(path, allow_pickle=True).item()
+        m = d['meta']
+        assert m['disruption_type'] == disruption_type, \
+            f'{path}: disruption {m["disruption_type"]} != {disruption_type}'
+        assert m['dataset'] == dataset and m['model_name'] == model_name, \
+            f'{path}: dataset/model {m["dataset"]}/{m["model_name"]}'
+        self.path = path
+        self.orig = np.asarray(d['orig_makespans'], dtype=float)
+        self.info = list(d['info'])
+        self.drl = d['records']['drl_reactive']
+        self.fp = d.get('state_fp')
+        self.n_checked = 0
+
+    def check(self, i, base, ms_orig, info, fp, ms_d, nerv3):
+        """nerv3 = (mch_nerv, time_nerv, comb_nerv) of SLAB's re-plan."""
+        where = f'{base} vs {os.path.basename(self.path)}'
+        assert i < len(self.orig), f'{where}: order {i} not in the file'
+        assert ms_orig == self.orig[i], \
+            f'{where}: original SLAB plan {ms_orig} != {self.orig[i]}'
+        assert info == self.info[i], f'{where}: {info} != {self.info[i]}'
+        if self.fp is not None:
+            assert fp == self.fp[i], f'{where}: state fingerprint differs'
+        assert ms_d == float(self.drl['makespan'][i]), \
+            f'{where}: SLAB re-plan {ms_d} != {self.drl["makespan"][i]}'
+        for k, v in zip(('mch_nerv', 'time_nerv', 'comb_nerv'), nerv3):
+            assert float(v) == float(self.drl[k][i]), \
+                f'{where}: SLAB {k} {v} != {self.drl[k][i]}'
+        self.n_checked += 1
 
 
 def drl_reactive_continue(ppo, env, state, assigned_mch):
@@ -855,6 +956,7 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
     # --- objective: minimize makespan (+ optional stability penalty) --------
     makespan = model.NewIntVar(0, horizon, 'makespan')
     model.AddMaxEquality(makespan, [ends[op] for op in range(n_ops)])
+    pen_vars = []   # (op, dev, shifted, orig_s) of the penalized model
     if pen_coef and pen_coef > 0:
         # Stability-aware objective: penalize, per UNCOMMITTED op, machine
         # reassignment and start-shift (>1 h) vs the ORIGINAL plan, i.e. the
@@ -880,6 +982,7 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
             model.Add(dev >= 2).OnlyEnforceIf(shifted)
             model.Add(dev <= 1).OnlyEnforceIf(shifted.Not())
             pen_terms.append(shifted)
+            pen_vars.append((op, dev, shifted, orig_s))
         model.Minimize(int(mk_coef) * makespan + int(pen_coef) * sum(pen_terms))
     else:
         model.Minimize(makespan)
@@ -919,6 +1022,12 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
                                   else min(ls + l_dur, horizon))
         hint_makespan = float(max(h_end_all))
         model.AddHint(makespan, int(hint_makespan))
+        # penalized model: the hint also sets each op's start deviation and
+        # shift indicator, so it is a complete solution
+        for op, dev, shifted, orig_s in pen_vars:
+            d_h = abs(int(h_start[op]) - int(orig_s))
+            model.AddHint(dev, d_h)
+            model.AddHint(shifted, 1 if d_h >= 2 else 0)
         hint_given = True
         if hint_check:
             chk = cp_model.CpSolver()
@@ -930,8 +1039,15 @@ def residual_cpsat_solve(jl, pt, perturbed_time_lag, disrupt, budget,
             st = chk.Solve(model)
             hint_check_seconds = time.time() - t_chk
             hint_check_status = chk.StatusName(st)
-            if st not in (cp_model.OPTIMAL, cp_model.FEASIBLE) or \
-                    abs(chk.ObjectiveValue() - hint_makespan) > 1e-6:
+            ok_st = st in (cp_model.OPTIMAL, cp_model.FEASIBLE)
+            if pen_vars:
+                # penalized objective: check the makespan of the hint plan
+                ok_val = ok_st and abs(chk.Value(makespan)
+                                       - hint_makespan) <= 1e-6
+            else:
+                ok_val = ok_st and abs(chk.ObjectiveValue()
+                                       - hint_makespan) <= 1e-6
+            if not ok_val:
                 model.ClearHints()
                 hint_given = False
 
@@ -1100,6 +1216,10 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
                 'above_rs': np.zeros(n, dtype=bool),
                 'above_hint': np.zeros(n, dtype=bool)})
     n_hint_failed = 0   # instances solved cold: hint could not be built/checked
+    state_fps = []
+    match = (ReactiveMatch(args.match_reactive, disruption_type, dataset,
+                           args.model_name)
+             if getattr(args, 'match_reactive', None) else None)
     orig_makespans = np.full(n, np.nan)
     # CP-SAT proof status counters per budget
     optimal_count = {b: 0 for b in budgets}
@@ -1115,7 +1235,9 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
     print(f'  disruption={disruption_type}  offset={args.disruption_offset}  '
           f'lag_factor={args.lag_factor}  budgets(s)={budgets}'
           + (f'  hint={args.hint}' if getattr(args, 'hint', 'none') != 'none'
-             else ''))
+             else '')
+          + (f'  breakdown_hours={args.breakdown_hours}'
+             if getattr(args, 'breakdown_hours', None) is not None else ''))
     print(f'  use_lag_features={use_lag_features}  '
           f'use_type_embedding={use_type_embedding}  seed_test={args.seed_test}')
     print('=' * 78)
@@ -1148,6 +1270,15 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
         jl_r, pt_r = disrupt['jl'], disrupt['pt']
         legacy = disrupt['legacy']
         ER = _import_eval_reactive()
+        fp_i = None
+        if getattr(args, 'breakdown_hours', None) is not None and legacy:
+            fp_i = assert_same_state_as_reactive(
+                ppo, jl, pt, meta, use_lag_features, use_type_embedding,
+                disruption_type, args, stem, disrupt, env)
+        elif getattr(args, 'state_fp', False) or match is not None:
+            fp_i = ER.state_fingerprint(disrupt, env)
+        if getattr(args, 'state_fp', False):
+            state_fps.append(fp_i)
 
         def _nerv(asg_new, oct_new):
             return ER.nervousness_mapped(pt, assigned_orig, oct_orig, pt_r,
@@ -1185,6 +1316,9 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
         rec['drl_reactive']['comb_nerv'][i] = cn
         rec['drl_reactive']['abs_shift'][i] = sh
         rec['drl_reactive']['feasible'][i] = res_d['feasible'] and ok_d
+        if match is not None:
+            match.check(i, base, ms_orig, disrupt['info'], fp_i, ms_d,
+                        (mn, tn, cn))
 
         # ---- (b) right-shift repair -----------------------------------------
         store_contention(rec['right_shift'], i, [], loadavg_now())
@@ -1432,6 +1566,18 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
         },
         'contention': contention,
     }
+    # new fields only when their option is used, so a default run writes
+    # exactly the keys it wrote before
+    if getattr(args, 'breakdown_hours', None) is not None:
+        payload['meta']['breakdown_hours'] = float(args.breakdown_hours)
+        payload['meta']['state_checked_against_eval_reactive'] = bool(
+            disruption_type in ('lag_perturb', 'breakdown'))
+    if getattr(args, 'state_fp', False):
+        payload['state_fp'] = state_fps
+    if match is not None:
+        payload['meta']['match_reactive'] = args.match_reactive
+        payload['meta']['n_matched_reactive'] = match.n_checked
+        payload['meta']['torch_threads'] = int(torch_threads())
     hint_stats = None
     if use_hint:
         hint_stats = {}
@@ -1529,7 +1675,10 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
     lines.append(f'- disruption: **{disruption_type}**  '
                  f'offset={args.disruption_offset}  '
                  f'lag_factor={args.lag_factor}  pt_factor={args.pt_factor}  '
-                 f'shortage={args.shortage_factor} x {args.shortage_basis}')
+                 f'shortage={args.shortage_factor} x {args.shortage_basis}'
+                 + (f'  breakdown_hours={args.breakdown_hours}'
+                    if getattr(args, 'breakdown_hours', None) is not None
+                    else ''))
     lines.append(f'- budgets (s): {budgets}  (num_workers='
                  f'{args.cpsat_workers or "default"})')
     if use_hint:
@@ -1605,6 +1754,11 @@ def run_disruption(disruption_type, args, ppo, stems, dataset, ckpt_path,
 # Main
 # ---------------------------------------------------------------------------
 
+def torch_threads():
+    import torch
+    return torch.get_num_threads()
+
+
 def _weight_to_coefs(w):
     """Map weight w (hours per nervousness unit) to integer (mk_coef, pen_coef)
     with w = pen_coef / mk_coef. w == 0 -> (1, 0) = makespan-only."""
@@ -1633,10 +1787,24 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
     # (instance, weight), including solves whose result is then discarded
     T = {w: [] for w in weights}
     orig_ms = []
+    # per-order detail (NaN / '' where a solve gave no valid schedule):
+    # makespan, objective, status and warm-start flag of every solve, and the
+    # SLAB makespan; kept outside 'frontier' / 'drl', whose form is fixed
+    X = {w: {'ms': [], 'objective': [], 'status': [], 'hint_given': [],
+             'valid': []} for w in weights}
+    drl_ms, hint_ms, state_fps = [], [], []
+    use_hint = getattr(args, 'stability_hint', 'none') == 'right_shift'
+    n_hint_failed = 0
+    match = (ReactiveMatch(args.match_reactive, disruption_type, dataset,
+                           args.model_name)
+             if getattr(args, 'match_reactive', None) else None)
 
     print('=' * 78)
     print(f'STABILITY SWEEP  disruption={disruption_type}  n={n}  '
-          f'budget={budget}s')
+          f'budget={budget}s'
+          + ('  hint=right_shift' if use_hint else '')
+          + (f'  breakdown_hours={args.breakdown_hours}'
+             if getattr(args, 'breakdown_hours', None) is not None else ''))
     print(f'  weights(w=pen/mk)={list(zip(weights, coefs))}')
     print('=' * 78)
 
@@ -1672,15 +1840,51 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
             return ER.nervousness_mapped(pt, assigned_orig, oct_orig, pt_r,
                                          asg_new, oct_new, op_map)[:3]
 
+        if getattr(args, 'breakdown_hours', None) is not None and \
+                disrupt['legacy']:
+            fp_i = assert_same_state_as_reactive(
+                ppo, jl, pt, meta, use_lag_features, use_type_embedding,
+                disruption_type, args, stem, disrupt, env)
+        else:
+            fp_i = ER.state_fingerprint(disrupt, env)
+        state_fps.append(fp_i)
+
+        # ---- warm start: the right-shift plan, built as the main run builds
+        # it (legacy operator for lag_perturb / breakdown, the prefix-
+        # respecting residual one otherwise), retimed to the integer model
+        hint = None
+        if use_hint:
+            if disrupt['legacy']:
+                _ms, _s2, asg_rs, oct_rs = right_shift_baseline(
+                    jl, pt, assigned_orig, oct_orig, perturbed_lag,
+                    disrupt['mch_ready_time'])
+            else:
+                _ms, _s2, asg_rs, oct_rs = ER.right_shift_residual(
+                    disrupt, assigned_orig, oct_orig, pt)
+            hb = right_shift_hint(jl_r, pt_r, perturbed_lag, disrupt,
+                                  asg_rs, oct_rs)
+            if hb['ok']:
+                hint = hb
+            else:
+                print(f'  !!! right-shift hint not built on {base}: '
+                      f'{hb["reason"]} -> cold solves')
+        hint_ms.append(float(hint['makespan']) if hint is not None
+                       else float('nan'))
+        hint_failed_i = use_hint and hint is None
+
         # ---- DRL-reactive operating point -----------------------------------
         ms_d, sec_d, asg_d, oct_d = drl_reactive_continue(
             ppo, env, state, disrupt['assigned_mch_prefix'].copy())
+        drl_ms.append(float(ms_d))
         rd = validate_schedule(jl_r, pt_r, perturbed_lag, asg_d, oct_d)
         if rd['feasible']:
             drl['feas'] += 1
         else:
             print(f'  !!! drl_reactive INFEASIBLE on {base}')
         mn, tn, cn = _nerv(asg_d, oct_d)
+        if match is not None:
+            match.check(i, base, ms_orig, disrupt['info'], fp_i, ms_d,
+                        (mn, tn, cn))
         drl['infl'].append(100.0 * (ms_d - ms_orig) / ms_orig)
         drl['nerv'].append(cn); drl['mch_nerv'].append(mn)
         drl['time_nerv'].append(tn); drl['sec'].append(sec_d)
@@ -1691,17 +1895,28 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
             if pc == 0:
                 res = residual_cpsat_solve(jl_r, pt_r, perturbed_lag, disrupt,
                                            budget,
-                                           num_workers=args.cpsat_workers)
+                                           num_workers=args.cpsat_workers,
+                                           hint=hint)
             else:
                 res = residual_cpsat_solve(jl_r, pt_r, perturbed_lag, disrupt,
                                            budget, mk_coef=mk, pen_coef=pc,
                                            assigned_orig=asg_orig_r,
                                            starts_orig=starts_orig_r,
-                                           num_workers=args.cpsat_workers)
+                                           num_workers=args.cpsat_workers,
+                                           hint=hint)
             T[w].append({'instance': base, **res['timing'],
                          **contention_fields([res['timing']], la_w)})
+            X[w]['status'].append(res['status'])
+            X[w]['hint_given'].append(bool(res['hint_given']))
+            X[w]['objective'].append(float(res['objective']))
+            if hint is not None and not res['hint_given']:
+                hint_failed_i = True
+                print(f'  !!! w={w} hint REJECTED by the check on {base} '
+                      f'({res["hint_check_status"]}) -> cold solve')
             if res['status'] not in ('OPTIMAL', 'FEASIBLE'):
                 print(f'  !!! w={w} NO SOLUTION on {base} ({res["status"]})')
+                X[w]['ms'].append(float('nan'))
+                X[w]['valid'].append(False)
                 continue
             ms_new = float(np.max(res['op_ct']))
             vres = validate_schedule(jl_r, pt_r, perturbed_lag,
@@ -1711,10 +1926,19 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
             if not disrupt['legacy']:
                 pviol = pviol + ER.check_residual_contract(
                     disrupt, res['assigned_mch'], res['op_ct'], tol=0.51)
-            if not vres['feasible'] or pviol:
+            bviol = check_breakdown_window(res, pt_r)
+            if bviol:
+                print(f'  !!! w={w} BREAKDOWN-WINDOW VIOLATION on {base}: '
+                      f'{bviol[:3]}')
+            if not vres['feasible'] or pviol or (bviol and getattr(
+                    args, 'stability_hint', 'none') != 'none'):
                 print(f'  !!! w={w} INVALID on {base}: feas={vres["feasible"]} '
                       f'prefix_viol={len(pviol)}')
+                X[w]['ms'].append(float('nan'))
+                X[w]['valid'].append(False)
                 continue
+            X[w]['ms'].append(ms_new)
+            X[w]['valid'].append(True)
             mn, tn, cn = _nerv(res['assigned_mch'], res['op_ct'])
             W[w]['infl'].append(100.0 * (ms_new - ms_orig) / ms_orig)
             W[w]['nerv'].append(cn); W[w]['mch_nerv'].append(mn)
@@ -1723,6 +1947,17 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
             if res['status'] == 'OPTIMAL':
                 W[w]['optimal'] += 1
 
+        if hint_failed_i:
+            n_hint_failed += 1
+        if use_hint or getattr(args, 'breakdown_hours', None) is not None:
+            print(f'  [{i + 1:3d}/{n}] {base}  orig={ms_orig:6.0f}h  '
+                  f'drl={ms_d:6.0f}h  hint={hint_ms[-1]:6.0f}h  '
+                  + '  '.join(f'w{w}={X[w]["ms"][-1]:6.0f}h('
+                              f'{X[w]["status"][-1][:4]},'
+                              f'{T[w][-1]["solve_wall_s"]:.1f}s,'
+                              f'cpu{T[w][-1]["cpu_share"]:.2f})'
+                              for w in weights)
+                  + f'   [{disrupt["info"]}]', flush=True)
         if (i + 1) % 10 == 0:
             print(f'  ...{i + 1}/{n} done')
 
@@ -1767,6 +2002,27 @@ def run_stability_sweep(disruption_type, args, ppo, stems, dataset,
         'timing': T,
         'contention': contention,
     }
+    # new fields only when their option is used, so a default run writes
+    # exactly the keys it wrote before
+    if use_hint or getattr(args, 'breakdown_hours', None) is not None or \
+            getattr(args, 'state_fp', False):
+        payload['per_order'] = {
+            'instance': [os.path.basename(s) for s in stems],
+            'orig_ms': [float(x) for x in orig_ms],
+            'drl_ms': drl_ms, 'hint_ms': hint_ms,
+            'frontier': {w: X[w] for w in weights}}
+        payload['state_fp'] = state_fps
+        payload['meta']['dataset'] = dataset
+        payload['meta']['model_name'] = args.model_name
+        payload['meta']['stability_hint'] = getattr(args, 'stability_hint',
+                                                    'none')
+        payload['meta']['n_hint_failed'] = n_hint_failed
+    if getattr(args, 'breakdown_hours', None) is not None:
+        payload['meta']['breakdown_hours'] = float(args.breakdown_hours)
+    if match is not None:
+        payload['meta']['match_reactive'] = args.match_reactive
+        payload['meta']['n_matched_reactive'] = match.n_checked
+        payload['meta']['torch_threads'] = int(torch_threads())
     outdir = args.out_dir or f'test_results/PPVC/{dataset}'
     os.makedirs(outdir, exist_ok=True)
     from common_utils import backbone_file_tag

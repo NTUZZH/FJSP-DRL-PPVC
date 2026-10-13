@@ -36,9 +36,9 @@ Please respect the upstream licenses and cite the original works.
   changed and added files are in `backbones/hgnn/LICENSE` and `backbones/hgnn/NOTICE`.
 - **PLAN** (file `model/plan.py`): the parallel-attention and liquid-encoder backbone of the PLAN fork of
   DANIEL, "PLAN: Parallel Liquid-Inspired Approximation Network for Efficient Representation Learning in
-  Flexible Job Shop Scheduling," arXiv:2608.03041, 2026. Upstream repository:
-  <https://github.com/Dhivya-DD17/PLAN>. The layers and state-dict names are kept, so the fork's
-  checkpoints load unchanged.
+  Flexible Job Shop Scheduling," arXiv:2608.03041, 2026. Its upstream repository
+  (`github.com/Dhivya-DD17/PLAN`) was not publicly accessible on 12 October 2026. The layers and
+  state-dict names are kept, so the fork's checkpoints load unchanged.
 - Further upstreams credited by DANIEL: L2D (<https://github.com/zcaicaros/L2D>), Google OR-Tools, and
   pyGAT.
 
@@ -133,7 +133,9 @@ the 15-station factory the tight preset, and the 9-station factory the small pre
 | `80x25+ppvc-mixed` | 80 | 25 | 50 | 110000 | production-batch size |
 | `10x15+ppvc-mixed` | 10 | 15 | 100 | 60000 | tight factory |
 | `5x9+ppvc-mixed` | 5 | 9 | 50 | 70000 | small factory |
-| `10x25+ppvc-rc_project`, `10x25+ppvc-steel_project` | 10 | 25 | 50 each | 90000, 95000 | single-shell projects |
+| `10x25+ppvc-rc_project`, `10x25+ppvc-steel_project` | 10 | 25 | 50 each | 90000, 95000 | single-shell projects of the first release (reference only; the RC seeds overlap those of the 30-module set) |
+| `10x25+ppvc-rc_project-ind`, `10x25+ppvc-steel_project-ind` | 10 | 25 | 50 each | 740000, 750000 | single-shell projects (RC or steel modules only) |
+| `50x25+ppvc-rc_project`, `50x25+ppvc-steel_project` | 50 | 25 | 50 each | 760000, 770000 | single-shell projects at a production-batch size |
 | `10x25+ppvc-mixed-ind` | 10 | 25 | 100 | 720000 | independent confirmation |
 | `20x25+ppvc-mixed-ind` | 20 | 25 | 50 | 730000 | independent confirmation |
 | `50x25+ppvc-mixed-ind` | 50 | 25 | 50 | 700000 | independent confirmation |
@@ -182,13 +184,19 @@ The HGNN runs are in `backbones/hgnn/save/<run>/` (`best.pt`, `last.pt`, `run_co
 |---|---|
 | `eval_ppvc.py` | greedy and sampling rollouts of a policy, and the dispatching rules, on a test set; every schedule is validated |
 | `eval_a0_repair.py` | a policy trained without waits plans on a wait-free environment, and the plan is right-shift repaired to the true waits |
-| `eval_memetic.py` | memetic algorithm for the job shop with time-lags (Caumond, Lacomme, Tchernev, 2008), extended with machine assignment, under a wall-clock budget |
+| `eval_memetic.py` | memetic algorithm for the job shop with time-lags (Caumond, Lacomme, Tchernev, 2008), extended with machine assignment, under a wall-clock budget; `--fast_eval` uses the exact compiled evaluator of `fast_lpath.py`, `--pm` sets the local-search rate (the paper uses 1.0), `--instances LO:HI` runs a range of orders |
+| `fast_lpath.py` | exact longest-path schedule evaluator and decoders, bit-identical to `right_shift_repair.py`; compiled with numba when it is installed, plain Python otherwise |
+| `merge_memetic_parts.py` | merges the per-range result files of `eval_memetic.py --instances` into one result file |
 | `eval_ga.py` | two-vector genetic algorithm for the FJSP with the same lag semantics |
 | `eval_cpsat_anytime.py` | CP-SAT on the lag-aware model, cold or warm-started from a rule or policy schedule, with the incumbent trajectory over time |
 | `eval_cpsat_budget.py`, `eval_cpsat_warmstart.py` | CP-SAT under short budgets, cold and warm-started from the SPT schedule |
 | `eval_stochastic_lags.py` | closed-loop execution when the realized waits differ from the nominal ones (lognormal, given coefficient of variation), with policy, rule, and CP-SAT re-planning |
-| `eval_reactive.py` | re-planning after six disruption types (longer wait, machine breakdown, urgent order, material shortage, processing-time deviation, cancellation), against right-shift repair and CP-SAT |
-| `eval_residual_cpsat.py` | CP-SAT re-solving only the unstarted part of a disrupted schedule under a time budget |
+| `eval_reactive.py` | re-planning after six disruption types (longer wait, machine breakdown, urgent order, material shortage, processing-time deviation, cancellation) by the policy, rule re-planners (SPTL, SPT, LLF), a genetic algorithm, and right-shift repair; `--breakdown_hours` sets the outage length, `--fast_eval` the compiled GA decoder |
+| `eval_residual_cpsat.py` | CP-SAT re-solving only the unstarted part of a disrupted schedule under a time budget, started from the right-shifted plan; `--match_reactive` asserts the same disrupted states as `eval_reactive.py`, `--stability_sweep` adds a penalty per changed operation |
+| `eval_shell_projects.py` | single-shell test sets (seed audit, generation, evaluation, paired tests) |
+| `analysis_bound_tightness.py` | ratio of the lag-augmented and the lag-free bound to the final makespan along the policy's schedules, with an admissibility check on every state |
+| `analysis_stats_tables_7_9.py` | paired tests with Holm adjustment for the training options, the uncertain-wait study, and the disruption study |
+| `analysis_cpsat_time_to_slab.py` | time CP-SAT needs to reach the policy's makespan, from the anytime logs |
 | `eval_buffers.py` | number of lag-buffer slots that schedules use, and the makespan when the buffer is finite |
 | `eval_buffer_occupancy.py` | lag-buffer occupancy of the policy and rule schedules |
 | `eval_flowline.py` | makespan when every operation keeps one station of its type (flow-line routing) |

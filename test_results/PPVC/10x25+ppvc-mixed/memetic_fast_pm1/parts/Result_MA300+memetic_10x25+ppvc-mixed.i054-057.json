@@ -1,0 +1,575 @@
+{
+ "method": "memetic (Caumond, Lacomme, Tchernev 2008), flexible-shop adaptation",
+ "dataset": "10x25+ppvc-mixed",
+ "route_variant": "fixed",
+ "n_instances": 3,
+ "budget_s": 300.0,
+ "budget_includes_seeding": false,
+ "max_gens": 1000000,
+ "seed": 0,
+ "seed_test": 50,
+ "params": {
+  "nc": 50,
+  "n1": 14,
+  "np": 20000,
+  "pm": 1.0,
+  "mni": 1000000,
+  "nm": 10,
+  "pr": 0.5,
+  "mark_K": 49999,
+  "rules": [
+   "FIFO",
+   "MOR",
+   "SPT",
+   "MWKR",
+   "SPTL",
+   "LLF",
+   "MWKRL",
+   "LRPTL"
+  ]
+ },
+ "fast_eval": true,
+ "numba": "0.68.0",
+ "instance_range": [
+  54,
+  57
+ ],
+ "instances": [
+  {
+   "instance": "instance_054",
+   "best_makespan": 207.0,
+   "best_seed_makespan": 217.0,
+   "spt_makespan": 219.0,
+   "generations": 580620,
+   "ls_calls": 580620,
+   "ls_improvements": 957713,
+   "restarts": 28,
+   "clones_rejected": 259589,
+   "iter_to_best": 3476,
+   "time_to_best_s": 5.193,
+   "seed_s": 2.578,
+   "search_s": 300.0,
+   "total_s": 302.578,
+   "s_per_generation": 0.0005166890791102991,
+   "n_seeds": 14,
+   "validator_violations": 0,
+   "seeds": [
+    {
+     "rule": "FIFO",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 237.0,
+     "decoded_makespan": 237.0
+    },
+    {
+     "rule": "MOR",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 247.0,
+     "decoded_makespan": 247.0
+    },
+    {
+     "rule": "SPT",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 219.0,
+     "decoded_makespan": 219.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 236.0,
+     "decoded_makespan": 236.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 218.0,
+     "decoded_makespan": 218.0
+    },
+    {
+     "rule": "LLF",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 218.0,
+     "decoded_makespan": 218.0
+    },
+    {
+     "rule": "MWKRL",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 225.0,
+     "decoded_makespan": 225.0
+    },
+    {
+     "rule": "LRPTL",
+     "round": 0,
+     "tie_seed": 104,
+     "env_makespan": 236.0,
+     "decoded_makespan": 236.0
+    },
+    {
+     "rule": "FIFO",
+     "round": 1,
+     "tie_seed": 7973,
+     "env_makespan": 237.0,
+     "decoded_makespan": 237.0
+    },
+    {
+     "rule": "MOR",
+     "round": 1,
+     "tie_seed": 7973,
+     "env_makespan": 243.0,
+     "decoded_makespan": 243.0
+    },
+    {
+     "rule": "SPT",
+     "round": 1,
+     "tie_seed": 7973,
+     "env_makespan": 222.0,
+     "decoded_makespan": 222.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 1,
+     "tie_seed": 7973,
+     "env_makespan": 237.0,
+     "decoded_makespan": 237.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 1,
+     "tie_seed": 7973,
+     "env_makespan": 217.0,
+     "decoded_makespan": 217.0
+    },
+    {
+     "rule": "LLF",
+     "round": 1,
+     "tie_seed": 7973,
+     "env_makespan": 218.0,
+     "decoded_makespan": 218.0
+    }
+   ],
+   "improvement_trace": [
+    [
+     0,
+     2.586,
+     217.0
+    ],
+    [
+     338,
+     2.868,
+     214.0
+    ],
+    [
+     635,
+     3.134,
+     213.0
+    ],
+    [
+     678,
+     3.173,
+     212.0
+    ],
+    [
+     849,
+     3.331,
+     211.0
+    ],
+    [
+     1588,
+     3.948,
+     210.0
+    ],
+    [
+     1904,
+     4.209,
+     209.0
+    ],
+    [
+     3311,
+     5.078,
+     208.0
+    ],
+    [
+     3476,
+     5.193,
+     207.0
+    ]
+   ],
+   "solve_wall_s": 300.0001,
+   "solve_cpu_s": 299.9892,
+   "workers": 1,
+   "cpu_share": 1.0,
+   "status": "budget",
+   "time_limit_s": 300.0,
+   "hit_limit": true,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    16
+   ],
+   "loadavg_start": [
+    16.24,
+    16.19,
+    16.07
+   ]
+  },
+  {
+   "instance": "instance_055",
+   "best_makespan": 199.0,
+   "best_seed_makespan": 206.0,
+   "spt_makespan": 208.0,
+   "generations": 778755,
+   "ls_calls": 778755,
+   "ls_improvements": 538882,
+   "restarts": 38,
+   "clones_rejected": 578899,
+   "iter_to_best": 4297,
+   "time_to_best_s": 4.983,
+   "seed_s": 2.177,
+   "search_s": 300.0,
+   "total_s": 302.177,
+   "s_per_generation": 0.0003852302854777878,
+   "n_seeds": 14,
+   "validator_violations": 0,
+   "seeds": [
+    {
+     "rule": "FIFO",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 214.0,
+     "decoded_makespan": 214.0
+    },
+    {
+     "rule": "MOR",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 216.0,
+     "decoded_makespan": 216.0
+    },
+    {
+     "rule": "SPT",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 208.0,
+     "decoded_makespan": 208.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 212.0,
+     "decoded_makespan": 212.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 209.0,
+     "decoded_makespan": 209.0
+    },
+    {
+     "rule": "LLF",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 208.0,
+     "decoded_makespan": 208.0
+    },
+    {
+     "rule": "MWKRL",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 210.0,
+     "decoded_makespan": 210.0
+    },
+    {
+     "rule": "LRPTL",
+     "round": 0,
+     "tie_seed": 105,
+     "env_makespan": 209.0,
+     "decoded_makespan": 209.0
+    },
+    {
+     "rule": "FIFO",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 221.0,
+     "decoded_makespan": 221.0
+    },
+    {
+     "rule": "MOR",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 216.0,
+     "decoded_makespan": 216.0
+    },
+    {
+     "rule": "SPT",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 212.0,
+     "decoded_makespan": 212.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 212.0,
+     "decoded_makespan": 212.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 213.0,
+     "decoded_makespan": 213.0
+    },
+    {
+     "rule": "LLF",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 213.0,
+     "decoded_makespan": 213.0
+    },
+    {
+     "rule": "MWKRL",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 209.0,
+     "decoded_makespan": 209.0
+    },
+    {
+     "rule": "LRPTL",
+     "round": 1,
+     "tie_seed": 7974,
+     "env_makespan": 206.0,
+     "decoded_makespan": 206.0
+    }
+   ],
+   "improvement_trace": [
+    [
+     0,
+     2.185,
+     206.0
+    ],
+    [
+     475,
+     2.53,
+     205.0
+    ],
+    [
+     667,
+     2.684,
+     204.0
+    ],
+    [
+     669,
+     2.686,
+     203.0
+    ],
+    [
+     745,
+     2.75,
+     201.0
+    ],
+    [
+     2641,
+     3.955,
+     200.0
+    ],
+    [
+     4297,
+     4.983,
+     199.0
+    ]
+   ],
+   "solve_wall_s": 300.0001,
+   "solve_cpu_s": 299.9882,
+   "workers": 1,
+   "cpu_share": 1.0,
+   "status": "budget",
+   "time_limit_s": 300.0,
+   "hit_limit": true,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    16
+   ],
+   "loadavg_start": [
+    16.02,
+    16.1,
+    16.07
+   ]
+  },
+  {
+   "instance": "instance_056",
+   "best_makespan": 206.0,
+   "best_seed_makespan": 207.0,
+   "spt_makespan": 209.0,
+   "generations": 475249,
+   "ls_calls": 475249,
+   "ls_improvements": 1215179,
+   "restarts": 23,
+   "clones_rejected": 213449,
+   "iter_to_best": 354847,
+   "time_to_best_s": 228.466,
+   "seed_s": 1.901,
+   "search_s": 300.0,
+   "total_s": 301.901,
+   "s_per_generation": 0.0006312480525409751,
+   "n_seeds": 14,
+   "validator_violations": 0,
+   "seeds": [
+    {
+     "rule": "FIFO",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 227.0,
+     "decoded_makespan": 227.0
+    },
+    {
+     "rule": "MOR",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 232.0,
+     "decoded_makespan": 232.0
+    },
+    {
+     "rule": "SPT",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 209.0,
+     "decoded_makespan": 209.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 217.0,
+     "decoded_makespan": 217.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 209.0,
+     "decoded_makespan": 209.0
+    },
+    {
+     "rule": "LLF",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 209.0,
+     "decoded_makespan": 209.0
+    },
+    {
+     "rule": "MWKRL",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 210.0,
+     "decoded_makespan": 210.0
+    },
+    {
+     "rule": "LRPTL",
+     "round": 0,
+     "tie_seed": 106,
+     "env_makespan": 207.0,
+     "decoded_makespan": 207.0
+    },
+    {
+     "rule": "FIFO",
+     "round": 1,
+     "tie_seed": 7975,
+     "env_makespan": 236.0,
+     "decoded_makespan": 236.0
+    },
+    {
+     "rule": "MOR",
+     "round": 1,
+     "tie_seed": 7975,
+     "env_makespan": 237.0,
+     "decoded_makespan": 237.0
+    },
+    {
+     "rule": "SPT",
+     "round": 1,
+     "tie_seed": 7975,
+     "env_makespan": 213.0,
+     "decoded_makespan": 213.0
+    },
+    {
+     "rule": "MWKR",
+     "round": 1,
+     "tie_seed": 7975,
+     "env_makespan": 216.0,
+     "decoded_makespan": 216.0
+    },
+    {
+     "rule": "SPTL",
+     "round": 1,
+     "tie_seed": 7975,
+     "env_makespan": 214.0,
+     "decoded_makespan": 214.0
+    },
+    {
+     "rule": "LLF",
+     "round": 1,
+     "tie_seed": 7975,
+     "env_makespan": 214.0,
+     "decoded_makespan": 214.0
+    }
+   ],
+   "improvement_trace": [
+    [
+     0,
+     1.909,
+     207.0
+    ],
+    [
+     354847,
+     228.466,
+     206.0
+    ]
+   ],
+   "solve_wall_s": 300.0001,
+   "solve_cpu_s": 299.9875,
+   "workers": 1,
+   "cpu_share": 1.0,
+   "status": "budget",
+   "time_limit_s": 300.0,
+   "hit_limit": true,
+   "cpu_share_min": 1.0,
+   "n_timed_solves": 1,
+   "n_hit_limit": 1,
+   "n_low_share": 0,
+   "n_no_evidence": 0,
+   "affinity": [
+    16
+   ],
+   "loadavg_start": [
+    15.98,
+    16.05,
+    16.06
+   ]
+  }
+ ],
+ "contention": {
+  "n_records": 3,
+  "n_records_without_fields": 0,
+  "n_timed_solves": 3,
+  "n_hit_limit": 3,
+  "n_low_share": 0,
+  "n_no_evidence": 0,
+  "cpu_share_min": 1.0
+ }
+}

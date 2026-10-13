@@ -28,7 +28,7 @@ def test_format_rules():
     assert mpm.fmt('s', 0.472) == '0.47' and mpm.fmt('s', 11.337) == '11.3'
     assert mpm.fmt('median', 9.0) == '9' and mpm.fmt('median', 17.5) == '17.5'
     assert mpm.fmt_p(1.8e-10) == r'$1.8\times10^{-10}$'
-    assert mpm.fmt_p(0.0496) == r'$5.0\times10^{-2}$'
+    assert mpm.fmt_p(0.0496) == '$0.050$'          # 0.01 <= p: plain decimal
     assert mpm.fmt_p(0.996) == '$1.0$'
     assert mpm.pct(90.0, 100.0) == pytest.approx(-10.0)
     with pytest.raises(AssertionError):
@@ -80,8 +80,11 @@ def test_memetic_evidence_and_partial_json(tmp_path, monkeypatch):
     path = tmp_path / mpm.ma_rel(ds)
     path.parent.mkdir(parents=True)
     rec = dict(validator_violations=0, n_low_share=0, n_no_evidence=0,
-               cpu_share_min=0.99)
-    doc = dict(dataset=ds, budget_s=300.0, n_instances=2,
+               cpu_share_min=0.99, status='budget', hit_limit=True,
+               generations=1000, cpu_share=0.99)
+    doc = dict(dataset=ds, budget_s=300.0, n_instances=2, fast_eval=True,
+               params=dict(pm=1.0, mni=1000000), max_gens=1000000, seed=0,
+               seed_test=50,
                contention=dict(n_low_share=0, n_no_evidence=0,
                                n_records_without_fields=0, cpu_share_min=0.99),
                instances=[dict(rec, instance='instance_000', best_makespan=200.0),

@@ -120,6 +120,20 @@ DESIGN CHOICES WHERE THE PAPER LEAVES FREEDOM OR IS SILENT
 11. The rule environments run with the CPU device (the scheduler never reads
    a network), which also keeps this baseline off the GPU.
 
+FAST EVALUATION (--fast_eval, default off)
+  Same algorithm, same parameters, same random-number stream. The chromosome
+  decoding, the longest-path evaluation, the clone mark, the critical path,
+  the OS rebuild after a swap and the GOX recombination run as compiled
+  kernels of fast_lpath.py (numba), which compute the same float64 values as
+  right_shift_repair and the Python operators above; the rank selection draws
+  the same uniform number as Generator.choice and maps it through the same
+  cumulative distribution; the clone marks of the population are kept as a
+  multiset instead of being rebuilt every iteration. With a fixed seed and an
+  iteration cap the search trajectory (best makespan, iteration counts, local
+  search calls, improvement trace, final chromosome) is identical with and
+  without the flag (test_fast_lpath.py); under a wall-clock budget the flag
+  only changes how many iterations fit into the budget.
+
 VALIDATION
   Every final schedule is re-checked with schedule_validator.validate_schedule
   against the true lags (0 violations required), and the validator makespan
@@ -127,7 +141,11 @@ VALIDATION
 
 CLI
   python eval_memetic.py --data_path data/PPVC/10x25+ppvc-mixed \
-      [--budget_s 60] [--max_gens N] [--max_instances N] [--seed 0]
+      [--budget_s 60] [--max_gens N] [--max_instances N] [--seed 0] \
+      [--fast_eval] [--instances LO:HI] [--pm 0.05]
+  --instances LO:HI runs the orders LO..HI-1 with their global index (same
+  seeds as the full run) and adds .iLO-HI to the output stem, so a run can be
+  split over cores and the parts merged (merge_memetic_parts.py).
 
 OUTPUT
   <save_dir>/Result_MA<budget>+memetic_<dataset>.npy, shape [N, 2] =
@@ -150,12 +168,14 @@ OUTPUT
   not a valid measurement.
 """
 import argparse
+import bisect
 import glob
 import heapq
 import json
 import os
 import sys
 import time
+from operator import attrgetter
 
 import numpy as np
 
@@ -243,7 +263,8 @@ def route_variant(data_path):
 class Problem:
     """Static data of one instance plus the chromosome decoder."""
 
-    def __init__(self, job_length, op_pt, time_lag):
+    def __init__(self, job_length, op_pt, time_lag, fast=False):
+        self.fast = bool(fast)
         self.job_length = np.asarray(job_length, dtype=int)
         self.op_pt = np.asarray(op_pt)
         self.time_lag = np.asarray(time_lag, dtype=float)
@@ -257,6 +278,15 @@ class Problem:
         self.compat = [np.where(self.op_pt[i] > 0)[0] for i in range(self.n_ops)]
         self.base_os = self.op_job.copy()
         self.n_evals = 0
+        if self.fast:
+            import fast_lpath
+            self._fl = fast_lpath
+            self.op_pt_f = np.ascontiguousarray(self.op_pt, dtype=np.float64)
+            self.job_start64 = self.job_start.astype(np.int64)
+            self.job_end64 = (self.job_start + self.job_length).astype(np.int64)
+            self.job_pred64 = self.job_pred.astype(np.int64)
+            self.op_job64 = self.op_job.astype(np.int64)
+            self.lag64 = np.ascontiguousarray(self.time_lag, dtype=np.float64)
 
     # ---- chromosome -> machine sequences -------------------------------- #
     def decode(self, os_vec, ma_vec):
@@ -275,9 +305,47 @@ class Problem:
     def evaluate_seqs(self, seqs, ma_vec):
         """Shared lag-aware longest-path decoder -> (completion times, makespan)."""
         self.n_evals += 1
+        if self.fast:
+            ct, ms = self._fl.longest_path(self.job_length, self.op_pt,
+                                           self.time_lag, ma_vec, seqs,
+                                           job_pred=self.job_pred64)
+            return ct, float(ms)
         ct, ms = right_shift_repair(self.job_length, self.op_pt, self.time_lag,
                                     ma_vec, op_sequence_per_mch=seqs)
         return ct, float(ms)
+
+    # ---- fast path (fast_lpath kernels) --------------------------------- #
+    def evaluate_fast(self, os_vec, ma_vec):
+        """OS + MA -> (ct, makespan, order, machine predecessors, mark)."""
+        self.n_evals += 1
+        ct, ms, order, mprev, mark, code = self._fl.decode_eval(
+            os_vec, ma_vec, self.job_start64, self.job_end64, self.op_pt_f,
+            self.lag64, MARK_K)
+        if code != 0:
+            raise ValueError('evaluate_fast: OS is not a job-repetition '
+                             'sequence of this instance')
+        return ct, float(ms), order, mprev, int(mark)
+
+    def critical_path_fast(self, ind):
+        """critical_path() from the individual's machine predecessors;
+        kinds[k] = 1 for a machine arc, 0 for a job arc."""
+        path, kinds, code = self._fl.critical_path(
+            ind.ct, ind.ma, self.op_pt_f, ind.mprev, self.job_pred64,
+            self.lag64, TOL)
+        if code != 0:
+            raise RuntimeError(
+                f'critical path: no tight arc into op {int(path[-1])}')
+        return path, kinds
+
+    def os_after_swap(self, ind, u, v, pos_of):
+        """os_from_seqs() of the individual's sequences with u, v swapped."""
+        new_os, code = self._fl.os_after_swap(self.job_pred64, self.op_job64,
+                                              ind.mprev, u, v, pos_of)
+        if code != 0:
+            raise RuntimeError('os_after_swap: '
+                               + ('not a machine arc' if code == 1
+                                  else 'cycle in the swapped graph'))
+        return new_os
 
     def evaluate(self, os_vec, ma_vec):
         seqs, order = self.decode(os_vec, ma_vec)
@@ -359,21 +427,30 @@ class Problem:
 # Individuals
 # --------------------------------------------------------------------------- #
 class Individual:
-    __slots__ = ('os', 'ma', 'ms', 'ct', 'seqs', 'order', 'mark')
+    __slots__ = ('os', 'ma', 'ms', 'ct', 'seqs', 'order', 'mark', 'mprev')
 
     def __init__(self, prob, os_vec, ma_vec):
         self.os = np.asarray(os_vec, dtype=int)
         self.ma = np.asarray(ma_vec, dtype=int)
+        if prob.fast:
+            # machine sequences are carried as machine predecessors (mprev)
+            (self.ct, self.ms, self.order, self.mprev,
+             self.mark) = prob.evaluate_fast(self.os, self.ma)
+            self.seqs = None
+            return
         self.ms, self.ct, self.seqs, self.order = prob.evaluate(self.os, self.ma)
         self.mark = prob.mark(self.ct, self.ma)
+        self.mprev = None
 
     def copy(self):
         new = Individual.__new__(Individual)
         new.os, new.ma = self.os.copy(), self.ma.copy()
         new.ms, new.ct = self.ms, self.ct.copy()
-        new.seqs = [list(s) for s in self.seqs]
+        new.seqs = (None if self.seqs is None
+                    else [list(s) for s in self.seqs])
         new.order = self.order.copy()
         new.mark = self.mark
+        new.mprev = None if self.mprev is None else self.mprev.copy()
         return new
 
 
@@ -426,6 +503,8 @@ def local_search(prob, ind, nm=NM, deadline=float('inf')):
     Returns (individual, n_improving_moves). The returned individual is
     never worse than the input.
     """
+    if prob.fast:
+        return local_search_fast(prob, ind, nm=nm, deadline=deadline)
     cur = ind.copy()
     n_impr = 0
     for _ in range(nm):
@@ -446,6 +525,65 @@ def local_search(prob, ind, nm=NM, deadline=float('inf')):
                 key = pos_of.copy()
                 key[v] = pos_of[u] - 0.5
                 new_os = prob.os_from_seqs(seqs, key)
+                cand = Individual(prob, new_os, cur.ma)
+                if cand.ms < cur.ms - TOL:
+                    found = cand
+                    break
+            # (b) flexible-shop move: reassign v to another compatible machine
+            for m2 in prob.compat[v]:
+                if m2 == cur.ma[v]:
+                    continue
+                ma2 = cur.ma.copy()
+                ma2[v] = m2
+                cand = Individual(prob, cur.os, ma2)
+                if cand.ms < cur.ms - TOL:
+                    found = cand
+                    break
+            if found is not None:
+                break
+        if found is None:
+            break
+        cur = found
+        n_impr += 1
+        if time.time() > deadline:
+            break
+    return cur, n_impr
+
+
+# --------------------------------------------------------------------------- #
+# Fast operators (--fast_eval): same decisions, same random draws
+# --------------------------------------------------------------------------- #
+def gox_fast(rng, donor, receiver, prob):
+    """gox() with the substring drawn by the same two rng calls and the
+    recombination done by the fast_lpath kernel."""
+    n = len(donor)
+    lo, hi = max(1, n // 3), max(1, n // 2)
+    length = int(rng.integers(lo, hi + 1))
+    start = int(rng.integers(0, n - length + 1))
+    return prob._fl.gox(donor, receiver, prob.job_start64, start, length)
+
+
+def local_search_fast(prob, ind, nm=NM, deadline=float('inf')):
+    """local_search() on the fast path: the same walk, the same moves in the
+    same order, the same acceptance rule."""
+    cur = ind.copy()
+    n_impr = 0
+    n = prob.n_ops
+    ar = np.arange(n, dtype=float)
+    for _ in range(nm):
+        path, kinds = prob.critical_path_fast(cur)
+        n_kinds = len(kinds)
+        pos_of = np.empty(n, dtype=float)
+        pos_of[cur.order] = ar
+        found = None
+        for k in range(len(path)):
+            v = int(path[k])
+            if time.time() > deadline:
+                break
+            # (a) paper move: swap the machine arc u -> v on the critical path
+            if k < n_kinds and kinds[k] == 1:
+                u = int(path[k + 1])
+                new_os = prob.os_after_swap(cur, u, v, pos_of)
                 cand = Individual(prob, new_os, cur.ma)
                 if cand.ms < cur.ms - TOL:
                     found = cand
@@ -560,6 +698,11 @@ def run_memetic(prob, rng, seeds=(), budget_s=None, max_gens=MNI, nc=NC,
     of iterations. t_origin (time.time() at instance start) is used only to
     report time-to-best including the seeding time.
     """
+    if prob.fast:
+        return run_memetic_fast(prob, rng, seeds, budget_s=budget_s,
+                                max_gens=max_gens, nc=nc, pm=pm, nm=nm,
+                                np_restart=np_restart, pr=pr,
+                                t_origin=t_origin)
     t0 = time.time()
     t_origin = t0 if t_origin is None else t_origin
     deadline = t0 + budget_s if budget_s is not None else float('inf')
@@ -645,6 +788,126 @@ def run_memetic(prob, rng, seeds=(), budget_s=None, max_gens=MNI, nc=NC,
     return best, stats
 
 
+def run_memetic_fast(prob, rng, seeds=(), budget_s=None, max_gens=MNI, nc=NC,
+                     pm=PM, nm=NM, np_restart=NP_RESTART, pr=PR,
+                     t_origin=None):
+    """run_memetic() on the fast path. Same steps and the same random draws:
+
+    * rank selection: Generator.choice(nc, p=sel_p) draws one uniform u with
+      Generator.random() and returns cdf.searchsorted(u, side='right') with
+      cdf = p.cumsum() / p.cumsum()[-1]; bisect_right on the same cdf is the
+      same index for the same u;
+    * the clone marks of the population are kept as a multiset (mark ->
+      count), updated on every replacement and rebuilt after a restart,
+      instead of a set rebuilt every iteration;
+    * GOX, decoding, evaluation, local search through the fast kernels.
+    """
+    t0 = time.time()
+    t_origin = t0 if t_origin is None else t_origin
+    deadline = t0 + budget_s if budget_s is not None else float('inf')
+    by_ms = attrgetter('ms')
+
+    pop, marks = [], []
+    for s in seeds:
+        if len(pop) < nc and s.mark not in marks:
+            pop.append(s.copy())
+            marks.append(s.mark)
+    tries = 0
+    while len(pop) < nc:
+        ind = random_individual(prob, rng)
+        tries += 1
+        if ind.mark in marks and tries < 50 * nc:
+            continue
+        pop.append(ind)
+        marks.append(ind.mark)
+    pop.sort(key=by_ms)
+
+    ranks = np.arange(nc, 0, -1, dtype=float)       # best has rank nc
+    sel_p = 2.0 * ranks / (nc * (nc + 1))
+    cdf = sel_p.cumsum()
+    cdf /= cdf[-1]
+    cdf = cdf.tolist()
+    half = nc // 2
+
+    def mark_counts(population):
+        cnt = {}
+        for x in population:
+            cnt[x.mark] = cnt.get(x.mark, 0) + 1
+        return cnt
+
+    mcount = mark_counts(pop)
+
+    best = pop[0].copy()
+    stats = dict(generations=0, ls_calls=0, ls_improvements=0, restarts=0,
+                 clones_rejected=0, iter_to_best=0,
+                 time_to_best_s=time.time() - t_origin,
+                 initial_best=best.ms, trace=[(0, round(time.time() - t_origin, 3),
+                                                best.ms)])
+    unproductive = 0
+    gen = 0
+    rand = rng.random
+    while gen < max_gens and time.time() < deadline:
+        gen += 1
+        i1 = bisect.bisect_right(cdf, rand())
+        i2 = i1
+        while i2 == i1:
+            i2 = bisect.bisect_right(cdf, rand())
+        p1, p2 = pop[i1], pop[i2]
+        c_os = gox_fast(rng, p1.os, p2.os, prob)
+        c_ma = uniform_ma(rng, p1.ma, p2.ma)
+        child = Individual(prob, c_os, c_ma)
+        if rand() < pm:
+            stats['ls_calls'] += 1
+            child, n_impr = local_search_fast(prob, child, nm=nm,
+                                              deadline=deadline)
+            stats['ls_improvements'] += n_impr
+
+        if mcount.get(child.mark, 0) > 0:
+            stats['clones_rejected'] += 1
+        else:
+            j = int(rng.integers(half, nc))
+            old = pop[j].mark
+            c = mcount[old] - 1
+            if c:
+                mcount[old] = c
+            else:
+                del mcount[old]
+            mcount[child.mark] = 1
+            pop[j] = child
+            pop.sort(key=by_ms)
+
+        if pop[0].ms < best.ms - TOL:
+            best = pop[0].copy()
+            unproductive = 0
+            stats['iter_to_best'] = gen
+            stats['time_to_best_s'] = time.time() - t_origin
+            stats['trace'].append((gen, round(time.time() - t_origin, 3),
+                                   best.ms))
+        else:
+            unproductive += 1
+
+        if unproductive >= np_restart:
+            n_keep = max(1, int(round(nc * (1.0 - pr))))
+            kept = pop[:n_keep]
+            km = set(x.mark for x in kept)
+            fresh, tries = [], 0
+            while len(kept) + len(fresh) < nc:
+                ind = random_individual(prob, rng)
+                tries += 1
+                if ind.mark in km and tries < 50 * nc:
+                    continue
+                km.add(ind.mark)
+                fresh.append(ind)
+            pop = sorted(kept + fresh, key=by_ms)
+            mcount = mark_counts(pop)
+            stats['restarts'] += 1
+            unproductive = 0
+
+    stats['generations'] = gen
+    stats['search_s'] = time.time() - t0
+    return best, stats
+
+
 # --------------------------------------------------------------------------- #
 # Contention evidence of the budgeted search
 # --------------------------------------------------------------------------- #
@@ -697,9 +960,19 @@ def parse_cli(argv=None):
     ap.add_argument('--seed_test', type=int, default=50,
                     help='rule tie-break seed base, as in eval_ppvc.py')
     ap.add_argument('--np_restart', type=int, default=NP_RESTART)
+    ap.add_argument('--pm', type=float, default=PM,
+                    help='probability that a child undergoes local search '
+                         '(paper: 0.05; 1.0 = local search on every child)')
     ap.add_argument('--save_dir', type=str, default=None)
     ap.add_argument('--tag', type=str, default=None,
                     help='method tag in the file name (default MA<budget>)')
+    ap.add_argument('--fast_eval', action='store_true',
+                    help='compiled exact evaluator and operators '
+                         '(fast_lpath.py); same search trajectory')
+    ap.add_argument('--instances', type=str, default=None,
+                    help='LO:HI, run orders LO..HI-1 with their global index '
+                         '(seeds as in the full run); output stem gets '
+                         '.iLO-HI')
     return ap.parse_args(argv)
 
 
@@ -708,6 +981,14 @@ def main(argv=None):
     os.environ.setdefault('CUDA_VISIBLE_DEVICES', '')
     all_stems = list_instances(args.data_path)
     stems = all_stems[:args.max_instances] if args.max_instances else all_stems
+    lo, hi = 0, len(stems)
+    if args.instances:
+        a, b = args.instances.split(':')
+        lo = int(a) if a else 0
+        hi = min(int(b) if b else len(stems), len(stems))
+        if not 0 <= lo < hi:
+            sys.exit(f'[eval_memetic] empty instance range {args.instances}')
+        stems = stems[lo:hi]
     n = len(stems)
     dataset = os.path.basename(os.path.normpath(args.data_path))
     variant = route_variant(args.data_path)
@@ -717,20 +998,31 @@ def main(argv=None):
     save_dir = args.save_dir or os.path.join('test_results', 'PPVC', dataset)
     if args.save_dir is None and n < len(all_stems):
         save_dir = os.path.join(save_dir, 'partial')
+    numba_version = None
+    if args.fast_eval:
+        import fast_lpath
+        fast_lpath.warmup()          # compile / load kernels before any clock
+        numba_version = fast_lpath.NUMBA_VERSION
 
     print('=' * 72)
     print(f'eval_memetic  dataset={dataset} ({variant} routes)  instances={n}  '
           f'budget={budget}s  max_gens={args.max_gens}  seed={args.seed}')
-    print(f'  nc={NC} n1={N1} pm={PM} nm={NM} np={args.np_restart} pr={PR}; '
-          f'fitness = right_shift_repair longest path')
+    print(f'  nc={NC} n1={N1} pm={args.pm} nm={NM} np={args.np_restart} pr={PR}; '
+          f'fitness = ' + ('fast_lpath longest path (numba '
+                           f'{numba_version})' if args.fast_eval else
+                           'right_shift_repair longest path'))
+    if args.instances:
+        print(f'  instance range {lo}:{hi} (global indices)')
     print('=' * 72)
 
     results = np.zeros((n, 2))
     records = []
-    for i, stem in enumerate(stems):
+    for k_loc, stem in enumerate(stems):
+        i = lo + k_loc               # global instance index (seeds)
         base = os.path.basename(stem)
         jl, pt, meta = load_instance(stem)
-        prob = Problem(jl, pt, np.asarray(meta['time_lag']))
+        prob = Problem(jl, pt, np.asarray(meta['time_lag']),
+                       fast=args.fast_eval)
         la_start = loadavg_now()
         cpu_i, wall_i = time.process_time(), time.perf_counter()
         t_start = time.time()
@@ -745,7 +1037,7 @@ def main(argv=None):
         with SolveClock() as clk:
             best, st = run_memetic(prob, rng, seeds, budget_s=search_budget,
                                    max_gens=args.max_gens,
-                                   np_restart=args.np_restart,
+                                   np_restart=args.np_restart, pm=args.pm,
                                    t_origin=t_start)
         total_s = time.time() - t_start
         timing = _search_timing(args, budget, search_budget, st, clk,
@@ -758,7 +1050,7 @@ def main(argv=None):
         assert res['feasible'], (f'{base}: infeasible schedule\n  '
                                  + '\n  '.join(res['violations'][:10]))
         assert abs(res['makespan'] - best.ms) < TOL and abs(ms - best.ms) < TOL
-        results[i] = [best.ms, total_s]
+        results[k_loc] = [best.ms, total_s]
 
         seed_ms = [d['decoded_makespan'] for d in seed_info
                    if 'decoded_makespan' in d]
@@ -782,7 +1074,7 @@ def main(argv=None):
             n_seeds=len(seeds), validator_violations=len(res['violations']),
             seeds=seed_info, improvement_trace=st['trace'],
             **timing, **contention_fields([timing], la_start)))
-        print(f'  [{i + 1:3d}/{n}] {base}  MA={best.ms:7.1f}  '
+        print(f'  [{k_loc + 1:3d}/{n}] {base}  MA={best.ms:7.1f}  '
               f'best_seed={best_seed}  gens={st["generations"]:6d}  '
               f'ls={st["ls_calls"]}/{st["ls_improvements"]}  '
               f'ttb={st["time_to_best_s"]:.1f}s  seed={seed_s:.1f}s  '
@@ -792,7 +1084,14 @@ def main(argv=None):
     contention = contention_summary(records)
     os.makedirs(save_dir, exist_ok=True)
     stem_out = os.path.join(save_dir, f'Result_{tag}+memetic_{dataset}')
+    if args.instances:
+        stem_out += f'.i{lo:03d}-{hi:03d}'
     np.save(stem_out + '.npy', results)
+    extra = {}
+    if args.fast_eval:
+        extra.update(fast_eval=True, numba=numba_version)
+    if args.instances:
+        extra['instance_range'] = [lo, hi]
     with open(stem_out + '.json', 'w') as f:
         json.dump(dict(
             method='memetic (Caumond, Lacomme, Tchernev 2008), flexible-shop '
@@ -800,9 +1099,9 @@ def main(argv=None):
             n_instances=n, budget_s=budget,
             budget_includes_seeding=bool(args.budget_includes_seeding),
             max_gens=args.max_gens, seed=args.seed, seed_test=args.seed_test,
-            params=dict(nc=NC, n1=N1, np=args.np_restart, pm=PM, mni=MNI,
+            params=dict(nc=NC, n1=N1, np=args.np_restart, pm=args.pm, mni=MNI,
                         nm=NM, pr=PR, mark_K=MARK_K, rules=list(SEED_RULES)),
-            instances=records, contention=contention), f, indent=1)
+            **extra, instances=records, contention=contention), f, indent=1)
     print('-' * 72)
     print(f'  mean makespan {results[:, 0].mean():.2f}  '
           f'mean seconds {results[:, 1].mean():.1f}  feasible {n}/{n}')

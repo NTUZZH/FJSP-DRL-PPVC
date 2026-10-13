@@ -34,7 +34,8 @@ DISRUPTION TYPES (all applied at the same offset)
      job's candidate_free_time. CP-SAT / right-shift receive the perturbed
      time_lag array.
   2. breakdown (SECONDARY, unchanged): the busiest machine with residual work
-     goes down for 0.5 * mean(op processing time) from t_d. Env:
+     goes down for 0.5 * mean(op processing time) from t_d (or for
+     --breakdown_hours H hours when that option is given). Env:
      env.mch_free_time[0, m] (and the true copy) is raised to the release
      instant. Right-shift receives mch_ready_time (a floor on the FIRST op of
      that machine's frozen sequence). The whole-instance CP-SAT cannot encode
@@ -118,6 +119,16 @@ RE-SOLVE METHODS compared per disrupted instance
                      breakdown release floor on the FIRST op of the broken
                      machine's whole sequence, which moved operations that
                      had already run; see right_shift_arm.)
+  (b2) rule_spt_reactive / rule_llf_reactive : the SPT rule (shortest
+                     processing time, lag-blind) and the LLF rule (longest
+                     post-op lag first, ties by shortest processing time),
+                     common_utils.heuristic_select_action 'SPT' / 'LLF',
+                     continuing from the SAME disrupted env state exactly as
+                     spt_reactive does (deep copy of the disrupted env taken
+                     before any arm runs, np.random seeded with --seed_test
+                     for tie-breaks). Off by default; select with --methods.
+                     They run after every other arm, so the other arms are
+                     unchanged when they are added.
   (e) cpsat_<b>    : re-solve the PERTURBED whole instance from scratch at
                      budgets {5,30,300}s (reference; the prefix-respecting
                      residual CP-SAT lives in eval_residual_cpsat.py).
@@ -152,10 +163,25 @@ CLI
                          material_shortage|pt_deviation|cancellation]
       [--disruption_offset 0.4] [--lag_factor 2.0] [--pt_factor 1.5]
       [--shortage_factor 0.5] [--shortage_basis op_mean|remaining_work]
-      [--methods drl_reactive,spt_reactive,ga_reactive,right_shift]
+      [--breakdown_hours H]   (breakdown outage length; default 0.5 x mean pt)
+      [--methods drl_reactive,spt_reactive,ga_reactive,right_shift
+                 (+ optional rule_spt_reactive,rule_llf_reactive)]
       [--ga_budget 5] [--ga_pop 100] [--ga_seed 0]
       [--cpsat_budgets 5,30,300] [--cpsat_workers 0] [--device cpu]
-      [--seed_test 50] [--max_instances N] [--out_dir DIR]
+      [--seed_test 50] [--max_instances N] [--out_dir DIR] [--state_fp]
+      [--fast_eval] [--ga_max_gens G]
+  --fast_eval runs the GA arm with the compiled residual decoder and POX of
+  fast_lpath.py: the same operators, the same random draws and the same
+  float64 decoding as the default path, so with a fixed generation count
+  (--ga_max_gens) the best plan, its makespan and the generator state are
+  identical (test_reactive_gafast.py); under the --ga_budget clock it only
+  runs more generations. With either option the GA records also carry
+  'generations', and the meta carries fast_eval / ga_max_gens / numba.
+  --state_fp stores, per instance, state_fingerprint() of the disrupted state
+  (prefix, disruption, floors and the env's free times) in the npy, so a run
+  of eval_residual_cpsat.py with --state_fp can be checked to have seen the
+  identical states (both runs need the same TORCH_THREADS: the thread count
+  changes a few near-tie greedy decisions of the prefix).
 
 The module is importable (eval_residual_cpsat.py and the tests reuse its
 disruption construction); the CLI is parsed only when run as a script.
@@ -186,6 +212,10 @@ NEW_DISRUPTIONS = ('urgent_arrival', 'material_shortage', 'pt_deviation',
 ALL_DISRUPTIONS = LEGACY_DISRUPTIONS + NEW_DISRUPTIONS
 RESIDUAL_METHODS = ('drl_reactive', 'spt_reactive', 'ga_reactive',
                     'right_shift')
+# Optional closed-loop rule re-planners (not in the default --methods): the
+# same mechanism as spt_reactive with another common_utils rule.
+RULE_METHODS = {'rule_spt_reactive': 'SPT', 'rule_llf_reactive': 'LLF'}
+ALL_METHODS = RESIDUAL_METHODS + tuple(RULE_METHODS)
 
 # Seed offset for the urgent module: well above every dataset seed range, so
 # the arrival draw never coincides with an instance of any test set.
@@ -231,10 +261,14 @@ def parse_cli():
                     choices=['op_mean', 'remaining_work'],
                     help='op_mean: mean over remaining ops of the mean '
                          'compatible pt; remaining_work: their sum')
+    ap.add_argument('--breakdown_hours', type=float, default=None,
+                    help='breakdown: outage length in hours (default None = '
+                         '0.5 x the mean processing time of the order)')
     ap.add_argument('--methods', type=str,
                     default=','.join(RESIDUAL_METHODS),
                     help='comma-separated residual methods to run (CP-SAT '
-                         'arms come from --cpsat_budgets)')
+                         'arms come from --cpsat_budgets); optional rule '
+                         're-planners: ' + ', '.join(RULE_METHODS))
     ap.add_argument('--ga_budget', type=float, default=5.0,
                     help='ga_reactive wall-clock budget per instance (s)')
     ap.add_argument('--ga_pop', type=int, default=100,
@@ -254,6 +288,15 @@ def parse_cli():
     ap.add_argument('--out_dir', type=str, default=None,
                     help='output directory (default test_results/PPVC/'
                          '<dataset>)')
+    ap.add_argument('--state_fp', action='store_true',
+                    help='store the per-instance fingerprint of the disrupted '
+                         'state (state_fingerprint) in the npy')
+    ap.add_argument('--fast_eval', action='store_true',
+                    help='ga_reactive with the compiled residual decoder and '
+                         'POX of fast_lpath.py (same search, faster)')
+    ap.add_argument('--ga_max_gens', type=int, default=None,
+                    help='ga_reactive generation cap (default None: the '
+                         '--ga_budget clock alone ends the search)')
     args = ap.parse_args()
     if getattr(args, 'cpsat_workers', 1) == 0:
         # 0 would start one CP-SAT worker per machine core whatever the affinity mask;
@@ -741,7 +784,8 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
                           dparams, ictx=None):
     """Greedy-commit the first k ops, then apply the disruption.
 
-    dparams: dict with lag_factor, pt_factor, shortage_factor, shortage_basis.
+    dparams: dict with lag_factor, pt_factor, shortage_factor, shortage_basis
+             and optionally breakdown_hours (None or absent = 0.5 x mean pt).
     ictx:    instance_context(stem, meta) (needed for urgent_arrival).
 
     Returns a dict ds. Instance-level fields are in the REALIZED instance's op
@@ -769,6 +813,7 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
     pt_factor = float(dparams.get('pt_factor', 1.5))
     shortage_factor = float(dparams.get('shortage_factor', 0.5))
     shortage_basis = dparams.get('shortage_basis', 'op_mean')
+    breakdown_hours = dparams.get('breakdown_hours')
 
     M = pt.shape[1]
     n_ops = pt.shape[0]
@@ -842,10 +887,14 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
 
     elif disruption_type == 'breakdown':
         m = _pick_breakdown_machine(env)
-        # downtime = 0.5 * mean op processing time (TRUE units), normalized by
-        # the same slope as machine free time / pt.
+        # downtime = 0.5 * mean op processing time (TRUE units), or
+        # breakdown_hours when given, normalized by the same slope as machine
+        # free time / pt.
         mean_pt_true = float(pt[pt > 0].mean())
-        downtime_true = 0.5 * mean_pt_true
+        if breakdown_hours is None:
+            downtime_true = 0.5 * mean_pt_true
+        else:
+            downtime_true = float(breakdown_hours)
         downtime_norm = downtime_true / slope
         release_true = t_disrupt_true + downtime_true
         if m is None:
@@ -1025,6 +1074,55 @@ def build_disrupted_state(ppo, jl, pt, meta, use_lag_features,
         'k': k, 'info': info, 'legacy': legacy,
         'disruption_type': disruption_type,
     }
+
+
+def state_fingerprint(ds, env=None):
+    """SHA-1 of the disrupted state every residual arm starts from.
+
+    Covers the realized instance (jl, pt, time_lag, op_map), the committed
+    prefix (flags, machines, starts, completions), the disruption instant,
+    the broken machine and downtime, the release floors and, when env is
+    given, the env's free times and decision instant (taken BEFORE any arm
+    steps the env). eval_residual_cpsat.build_disrupted_state returns the
+    same keys for its own legacy branch, so equal fingerprints mean that the
+    two scripts start from the identical state.
+    """
+    import hashlib
+    h = hashlib.sha1()
+
+    def _add(name, a, dtype):
+        a = np.ascontiguousarray(np.asarray(a, dtype=dtype))
+        h.update(name.encode())
+        h.update(str(a.shape).encode())
+        h.update(a.tobytes())
+
+    _add('jl', ds['jl'], np.int64)
+    _add('pt', ds['pt'], np.float64)
+    _add('time_lag', ds['time_lag'], np.float64)
+    _add('op_map', ds['op_map'], np.int64)
+    _add('committed', ds['committed'], np.bool_)
+    _add('committed_mch', ds['committed_mch'], np.int64)
+    _add('committed_start', np.nan_to_num(np.asarray(
+        ds['committed_start'], dtype=np.float64), nan=-1.0), np.float64)
+    _add('committed_ct', np.nan_to_num(np.asarray(
+        ds['committed_ct'], dtype=np.float64), nan=-1.0), np.float64)
+    _add('t_disrupt', [float(ds['t_disrupt_true'])], np.float64)
+    bm = ds.get('broken_mch')
+    _add('broken_mch', [-1 if bm is None else int(bm)], np.int64)
+    dt = ds.get('downtime_true')
+    _add('downtime', [-1.0 if dt is None else float(dt)], np.float64)
+    _add('mch_release', ds['mch_release'], np.float64)
+    _add('op_release', ds['op_release'], np.float64)
+    if env is not None:
+        _add('env_mch_free', env.mch_free_time[0], np.float64)
+        _add('env_true_mch_free', env.true_mch_free_time[0], np.float64)
+        _add('env_cand_free', env.candidate_free_time[0], np.float64)
+        _add('env_true_cand_free', env.true_candidate_free_time[0],
+             np.float64)
+        _add('env_true_op_ct', env.true_op_ct[0], np.float64)
+        _add('env_scheduled', env.op_scheduled_flag[0], np.bool_)
+        _add('env_next', env.next_schedule_time, np.float64)
+    return h.hexdigest()
 
 
 def drl_reactive(ppo, jl, pt, meta, use_lag_features, use_type_embedding,
@@ -1219,7 +1317,7 @@ def _import_eval_ga():
 
 
 def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
-                elite=2, tour_k=3, timing=None):
+                elite=2, tour_k=3, timing=None, fast=False, max_gens=None):
     """eval_ga's GA on the residual problem, seeded with the right-shift plan.
 
     The chromosome is (operation sequence over the uncommitted ops, machine
@@ -1232,6 +1330,9 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
     Returns (makespan, seconds, assigned_mch[N_new], op_ct[N_new], gens).
     When timing is a dict it receives the run's contention evidence
     (solve_timing: one worker thread, status 'budget').
+    fast=True evaluates chromosomes with fast_lpath.residual_makespan and
+    fills POX children with fast_lpath.pox_fill (same values, same random
+    draws); max_gens caps the number of generations (None: budget only).
     """
     ga = _import_eval_ga()
     cpu0, wall0 = time.process_time(), time.perf_counter()
@@ -1257,6 +1358,16 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
     def _fit(ind):
         return prob.makespan_os(ind[0], ind[1].tolist())
 
+    crossover = ga.pox_crossover
+    ma_search = _residual_ma_local_search
+    rand_ind = ga.random_individual
+    if fast:
+        fr = _FastResidual(prob)
+        _fit = fr.fit
+        crossover = _pox_fast
+        ma_search = fr.ma_local_search
+        rand_ind = fr.random_individual
+
     if len(prob.uncommitted) == 0:
         out = (seed_fit, time.time() - t0, seed_ma, np.asarray(seed_ct), 0)
         _evidence()
@@ -1270,7 +1381,7 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
             o, m = ga.mutate(rng, o, m, compat, p_os=1.0, p_ma=1.0)
         pop.append((o, m))
     while len(pop) < pop_size:
-        pop.append(ga.random_individual(rng, prob.base_os, compat))
+        pop.append(rand_ind(rng, prob.base_os, compat))
     pop_fit = np.array([_fit(ind) for ind in pop])
     best_idx = int(np.argmin(pop_fit))
     best = (pop[best_idx][0].copy(), pop[best_idx][1].copy())
@@ -1278,7 +1389,8 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
 
     stagnate_limit, immigrant_frac, stagnation = 25, 0.4, 0
     gen = 0
-    while time.time() - t0 < budget_s:
+    while time.time() - t0 < budget_s and (max_gens is None
+                                           or gen < max_gens):
         gen += 1
         order = np.argsort(pop_fit)
         new_pop = [(pop[i][0].copy(), pop[i][1].copy()) for i in order[:elite]]
@@ -1286,7 +1398,7 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
             i1 = ga.tournament(rng, pop_fit, tour_k)
             i2 = ga.tournament(rng, pop_fit, tour_k)
             (o1, m1), (o2, m2) = pop[i1], pop[i2]
-            c_os = ga.pox_crossover(rng, o1, o2, n_jobs)
+            c_os = crossover(rng, o1, o2, n_jobs)
             c_ma = ga.uniform_crossover_ma(rng, m1, m2)
             c_os, c_ma = ga.mutate(rng, c_os, c_ma, compat)
             new_pop.append((c_os, c_ma))
@@ -1301,7 +1413,7 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
             stagnation += 1
         if stagnation == stagnate_limit:
             deadline = t0 + budget_s
-            improved = _residual_ma_local_search(prob, best, best_fit, deadline)
+            improved = ma_search(prob, best, best_fit, deadline)
             if improved is not None:
                 best, best_fit = improved
                 w = int(np.argmax(pop_fit))
@@ -1309,7 +1421,7 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
                 pop_fit[w] = best_fit
             n_imm = int(pop_size * immigrant_frac)
             for w in np.argsort(pop_fit)[-n_imm:]:
-                pop[w] = ga.random_individual(rng, prob.base_os, compat)
+                pop[w] = rand_ind(rng, prob.base_os, compat)
                 pop_fit[w] = _fit(pop[w])
             stagnation = 0
     best_os, best_ma = best
@@ -1318,6 +1430,89 @@ def ga_reactive(ds, seed_asg, seed_ct, budget_s, pop_size=100, rng=None,
     out = (float(ct.max()), time.time() - t0, best_ma.copy(), ct, gen)
     _evidence()
     return out
+
+
+def _pox_fast(rng, p1_os, p2_os, n_jobs):
+    """eval_ga.pox_crossover: the same two draws (permutation, cut), the
+    child filled by fast_lpath.pox_fill."""
+    import fast_lpath
+    perm = rng.permutation(n_jobs)
+    cut = rng.integers(1, n_jobs) if n_jobs > 1 else 1
+    in_set1 = np.zeros(n_jobs, dtype=np.bool_)
+    in_set1[perm[:cut]] = True
+    return fast_lpath.pox_fill(p1_os, p2_os, in_set1)
+
+
+class _FastResidual:
+    """ResidualProblem.makespan_os through fast_lpath.residual_makespan."""
+
+    def __init__(self, prob):
+        import fast_lpath
+        self._k = fast_lpath.residual_makespan
+        self.job_next0 = np.asarray(prob.job_next0, dtype=np.int64)
+        self.job_end = (prob.job_first + prob.jl).astype(np.int64)
+        self.ct0 = np.ascontiguousarray(prob.ct0, dtype=np.float64)
+        self.tail0 = np.asarray(prob.mch_tail0, dtype=np.float64)
+        self.ready0 = np.asarray(prob.job_ready0, dtype=np.float64)
+        self.pt = np.ascontiguousarray(prob.pt, dtype=np.float64)
+        self.lag = np.asarray(prob.lag_l, dtype=np.float64)
+        self.orl = np.asarray(prob.op_release_l, dtype=np.float64)
+        self.mrl = np.asarray(prob.mch_release_l, dtype=np.float64)
+        self.t_d = float(prob.t_d)
+        lens = [len(c) for c in prob.compat]
+        self.compat_len = np.asarray(lens, dtype=np.int64)
+        self.compat_off = np.concatenate([[0], np.cumsum(lens)[:-1]]).astype(
+            np.int64)
+        self.compat_flat = np.concatenate([np.asarray(c, dtype=np.int64)
+                                           for c in prob.compat])
+
+    def random_individual(self, rng, base_os, compat):
+        """eval_ga.random_individual with one vectorized draw: Generator.
+        integers(highs) returns the same values and leaves the same state as
+        one integers(high) call per op (test_reactive_gafast.py)."""
+        os_vec = base_os.copy()
+        rng.shuffle(os_vec)
+        idx = rng.integers(self.compat_len)
+        ma_vec = self.compat_flat[self.compat_off + idx].astype(int)
+        return os_vec, ma_vec
+
+    def makespan(self, os_vec, ma_vec):
+        ms = self._k(os_vec, ma_vec, self.job_next0, self.job_end, self.ct0,
+                     self.tail0, self.ready0, self.pt, self.lag, self.orl,
+                     self.mrl, self.t_d)
+        if ms < 0:
+            raise ValueError('residual OS lists a job too often')
+        return float(ms)
+
+    def fit(self, ind):
+        return self.makespan(ind[0], ind[1])
+
+    def ma_local_search(self, prob, ind, cur_fit, deadline):
+        """_residual_ma_local_search with the machine vector kept as an
+        int array (same moves, same order, same acceptance)."""
+        os_vec, ma_vec = ind[0].copy(), ind[1].copy()
+        f = cur_fit
+        improved = False
+        for op in prob.uncommitted:
+            if time.time() > deadline:
+                break
+            choices = prob.compat[op]
+            if len(choices) < 2:
+                continue
+            orig = int(ma_vec[op])
+            for m in choices:
+                m = int(m)
+                if m == orig:
+                    continue
+                ma_vec[op] = m
+                ms = self.makespan(os_vec, ma_vec)
+                if ms < f - 1e-9:
+                    f, orig, improved = ms, m, True
+                else:
+                    ma_vec[op] = orig
+        if improved:
+            return (os_vec, np.array(ma_vec, dtype=int)), float(f)
+        return None
 
 
 def _residual_ma_local_search(prob, ind, cur_fit, deadline):
@@ -1591,16 +1786,25 @@ def _new_record(n):
             'feasible': np.zeros(n, dtype=bool)}
 
 
+def dtype_is_not_breakdown(args):
+    return args.disruption_type != 'breakdown'
+
+
 def main():
     args = _ARGS
     budgets = [int(b) for b in args.cpsat_budgets.split(',') if b.strip()]
     run_methods = [m.strip() for m in args.methods.split(',') if m.strip()]
     for m in run_methods:
-        if m not in RESIDUAL_METHODS:
+        if m not in ALL_METHODS:
             sys.exit(f'[eval_reactive] unknown method {m}')
     dparams = {'lag_factor': args.lag_factor, 'pt_factor': args.pt_factor,
                'shortage_factor': args.shortage_factor,
                'shortage_basis': args.shortage_basis}
+    if args.breakdown_hours is not None:
+        if dtype_is_not_breakdown(args):
+            sys.exit('[eval_reactive] --breakdown_hours applies to '
+                     '--disruption_type breakdown only')
+        dparams['breakdown_hours'] = float(args.breakdown_hours)
     dtype = args.disruption_type
 
     # 1) apply the training-config architecture flags BEFORE building anything
@@ -1644,6 +1848,7 @@ def main():
 
     cpsat_method_names = [f'cpsat_{b}' for b in budgets]
     methods = [m for m in RESIDUAL_METHODS if m in run_methods] \
+        + [m for m in RULE_METHODS if m in run_methods] \
         + cpsat_method_names
 
     rec = {m: _new_record(n) for m in methods}
@@ -1654,9 +1859,20 @@ def main():
                      if m == 'ga_reactive' or m in cpsat_method_names]
     for m in methods:
         rec[m].update(contention_arrays(n, per_solve=m in timed_methods))
+    # generations of the GA runs, kept only with the new GA options so a
+    # default run writes exactly its old keys
+    ga_gens = None
+    if 'ga_reactive' in methods and (args.fast_eval
+                                     or args.ga_max_gens is not None):
+        ga_gens = np.zeros(n, dtype=np.int64)
+        rec['ga_reactive']['generations'] = ga_gens
+    if args.fast_eval:
+        import fast_lpath
+        fast_lpath.warmup_residual()     # compile / load before any clock
     orig_makespans = np.full(n, np.nan)
     n_ops_realized = np.zeros(n, dtype=int)
     infos = []
+    state_fps = []
     n_infeasible = 0
     n_contract = 0
 
@@ -1665,9 +1881,13 @@ def main():
           f'instances={n}')
     print(f'  disruption={dtype}  offset={args.disruption_offset}'
           f'  lag_factor={args.lag_factor}  pt_factor={args.pt_factor}'
-          f'  shortage={args.shortage_factor}x{args.shortage_basis}')
+          f'  shortage={args.shortage_factor}x{args.shortage_basis}'
+          + (f'  breakdown_hours={args.breakdown_hours}'
+             if args.breakdown_hours is not None else ''))
     print(f'  methods={methods}  ga_budget={args.ga_budget}s  '
           f'cpsat_budgets={budgets}  cpsat_workers={args.cpsat_workers}')
+    if args.fast_eval or args.ga_max_gens is not None:
+        print(f'  ga fast_eval={args.fast_eval}  ga_max_gens={args.ga_max_gens}')
     print(f'  use_lag_features={use_lag_features}  '
           f'use_type_embedding={use_type_embedding}  seed_test={args.seed_test}'
           f'  device={configs.device}')
@@ -1708,8 +1928,13 @@ def main():
         jl_r, pt_r, lag_r = ds['jl'], ds['pt'], ds['time_lag']
         n_ops_realized[i] = pt_r.shape[0]
         infos.append(ds['info'])
+        if args.state_fp:
+            state_fps.append(state_fingerprint(ds, ds['env']))
         env_spt = copy.deepcopy(ds['env']) if 'spt_reactive' in methods \
             else None
+        # untouched copies of the disrupted env for the optional rule arms
+        env_rules = {m: copy.deepcopy(ds['env']) for m in RULE_METHODS
+                     if m in methods}
 
         def _check(name, asg, ct, ms, contract=True):
             nonlocal n_infeasible, n_contract
@@ -1788,7 +2013,10 @@ def main():
             la_g, ga_t = loadavg_now(), {}
             ms_g, sec_g, asg_g, oct_g, gens = ga_reactive(
                 ds, rs_res[2], rs_res[3], args.ga_budget,
-                pop_size=args.ga_pop, rng=rng, timing=ga_t)
+                pop_size=args.ga_pop, rng=rng, timing=ga_t,
+                fast=args.fast_eval, max_gens=args.ga_max_gens)
+            if ga_gens is not None:
+                ga_gens[i] = gens
             store_contention(rec['ga_reactive'], i, [ga_t], la_g)
             sec_g += rs_res[1]
             ok, _ = _check('ga_reactive', asg_g, oct_g, ms_g)
@@ -1822,6 +2050,24 @@ def main():
                 _record(mname, i, ms_c, sec_c, None, feas, ms_orig)
             line.append('  '.join(f'cp{b}={sweep[b][0]:6.0f}h'
                                   for b in budgets))
+
+        # ---- (b2) optional rule re-planners (same mechanism as SPTL) --------
+        # run after every other arm, each on its own untouched copy of the
+        # disrupted env, so adding them changes no other arm
+        for m_rule, rule in RULE_METHODS.items():
+            if m_rule not in methods:
+                continue
+            env_r = env_rules[m_rule]
+            store_contention(rec[m_rule], i, [], loadavg_now())
+            np.random.seed(args.seed_test)
+            ms_r, sec_r, asg_r, oct_r = continue_residual(
+                env_r, env_r.state, ds['assigned_mch'].copy(),
+                rule_policy(rule))
+            ok, _ = _check(m_rule, asg_r, oct_r, ms_r)
+            nerv = nervousness_mapped(pt, assigned_orig, oct_orig, pt_r,
+                                      asg_r, oct_r, ds['op_map'])
+            _record(m_rule, i, ms_r, sec_r, nerv, ok, ms_orig)
+            line.append(f'{rule.lower()}={ms_r:6.1f}h')
 
         print(f'  [{i + 1:3d}/{n}] {base}  orig={ms_orig:6.0f}h  '
               + '  '.join(line) + f'   [{ds["info"]}]')
@@ -1862,6 +2108,18 @@ def main():
         },
         'contention': contention,
     }
+    # new fields only when their option is used, so a default run writes
+    # exactly the keys it wrote before
+    if args.breakdown_hours is not None:
+        payload['meta']['breakdown_hours'] = float(args.breakdown_hours)
+    if args.state_fp:
+        payload['state_fp'] = state_fps
+    if args.fast_eval:
+        import fast_lpath
+        payload['meta']['fast_eval'] = True
+        payload['meta']['numba'] = fast_lpath.NUMBA_VERSION
+    if args.ga_max_gens is not None:
+        payload['meta']['ga_max_gens'] = int(args.ga_max_gens)
     np.save(out_npy, payload, allow_pickle=True)
     print(f'\n  saved {out_npy}')
 
@@ -1887,7 +2145,9 @@ def main():
     lines.append(f'- disruption: **{dtype}**  '
                  f'offset={args.disruption_offset}  '
                  f'lag_factor={args.lag_factor}  pt_factor={args.pt_factor}  '
-                 f'shortage={args.shortage_factor} x {args.shortage_basis}')
+                 f'shortage={args.shortage_factor} x {args.shortage_basis}'
+                 + (f'  breakdown_hours={args.breakdown_hours}'
+                    if args.breakdown_hours is not None else ''))
     lines.append(f'- ga_reactive: budget {args.ga_budget} s, population '
                  f'{args.ga_pop}, seed {args.ga_seed}, seeded with the '
                  f'residual right-shift plan')
