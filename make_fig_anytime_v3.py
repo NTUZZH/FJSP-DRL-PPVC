@@ -53,19 +53,22 @@ PANELS = [
          hi=(690.0, 1215.0), hi_ticks=[800, 1000, 1200]),
 ]
 
-# House palette: one hue per starting schedule, medium-depth line variants,
-# spaced in luminance so the series also separate in greyscale.
-GREY = "#ababab"   # no starting schedule (context curve)
-ROSE = "#cc6d7b"   # SPT rule and CP-SAT started from it
-TEAL = "#1f6e6e"   # SLAB policy and CP-SAT started from it
+# Greyscale-safe styles: the grey level names the starting schedule (light: none,
+# dark grey: SPT, black: SLAB), and the line style separates the CP-SAT curves
+# (solid) from the two fixed reference lines (dashed and dash-dotted), so every
+# series stays distinct in a black-and-white print.
+LIGHT = "#a6a6a6"  # CP-SAT from scratch (context curve)
+DARK = "#555555"   # SPT rule and CP-SAT started from it
+BLACK = "#000000"  # SLAB policy and CP-SAT started from it
 DASH = (0, (4.0, 1.8))
+DASHDOT = (0, (5.0, 1.6, 1.2, 1.6))
 STYLE = {
-    "cold": dict(color=GREY, lw=1.1, ls="-", label="CP-SAT from scratch"),
-    "warm-spt": dict(color=ROSE, lw=1.1, ls="-", label="CP-SAT from the SPT schedule"),
-    "warm-policy-halflag-s301": dict(color=TEAL, lw=1.5, ls="-",
+    "cold": dict(color=LIGHT, lw=1.2, ls="-", label="CP-SAT from scratch"),
+    "warm-spt": dict(color=DARK, lw=1.1, ls="-", label="CP-SAT from the SPT schedule"),
+    "warm-policy-halflag-s301": dict(color=BLACK, lw=1.4, ls="-",
                                      label="CP-SAT from the SLAB schedule"),
-    "ref-slab": dict(color=TEAL, lw=0.9, ls=DASH, label="SLAB policy, three seeds"),
-    "ref-spt": dict(color=ROSE, lw=0.9, ls=DASH, label="SPT rule"),
+    "ref-slab": dict(color=BLACK, lw=0.9, ls=DASHDOT, label="SLAB policy, three seeds"),
+    "ref-spt": dict(color=DARK, lw=0.9, ls=DASH, label="SPT rule"),
 }
 
 
@@ -143,7 +146,7 @@ def main():
         "savefig.facecolor": "white", "figure.facecolor": "white",
     })
     lums = {name: round(luminance(c), 3) for name, c in
-            [("grey", GREY), ("rose", ROSE), ("teal", TEAL)]}
+            [("light", LIGHT), ("dark", DARK), ("black", BLACK)]}
 
     W, H = 3.5, 2.78
     fig = plt.figure(figsize=(W, H))

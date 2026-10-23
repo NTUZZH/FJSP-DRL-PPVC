@@ -1042,6 +1042,14 @@ def table4():
                    lambda d=ds, s=scale, f=field: tl_value(d, s, f), TL_REL,
                    f'{field} of SPT schedules, {ds}, lags x{scale:g}, '
                    f'first 20 instances')
+    # the Introduction quotes three of these shares as percentages
+    for name in ('ContTenLagFull', 'ContFifty', 'ContEighty'):
+        def as_pct(n=name):
+            v = int(round(100 * float(fmt('share', raw_of(n)))))
+            check(abs(100 * raw_of(n) - v) <= 0.5, f'{n}: percent and share disagree')
+            return v
+        define(f'{name}Pct', exc, 'ContPct', name, 'int', as_pct, TL_REL,
+               f'100 x {name} as printed (two decimals), in percent')
     for S, ds in sizes:
         srcs = f'{src(LFBOUND, ds)}, {src(FULL, ds)}'
 

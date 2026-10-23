@@ -189,7 +189,6 @@ def t1_micro():
 # ============================================================================
 def t2_property():
     print("T2  property test on real PPVC instances (seeds 42, 43, 44) ...")
-    seed42_makespans = None
     for s in (42, 43, 44):
         jl, op_pt, meta = ppvc_instance_generator(
             n_modules=5, class_mix='mixed',
@@ -230,13 +229,22 @@ def t2_property():
         print(f"      seed {s}: lag-blind makespan = {ms_lb:.1f}h  ->  "
               f"repaired = {rms:.1f}h  (+{rms - ms_lb:.0f}h, "
               f"+{100 * (rms / ms_lb - 1):.0f}%)")
-        if s == 42:
-            seed42_makespans = (ms_lb, rms)
-
-    if seed42_makespans is not None:
-        print(f"      [paper data point] seed 42: lag-blind {seed42_makespans[0]:.1f}h"
-              f" -> right-shift-repaired {seed42_makespans[1]:.1f}h "
-              f"(lag-aware FIFO reference = 206h)")
+    # Paper data point (Table II and Section III-B): order seed 42 with the FIFO
+    # tie-breaking draws of test_lag_env.rollout_fifo (rng seed 0), so the
+    # lag-free plan, its repair and the lag-aware FIFO run are the same FIFO.
+    from test_lag_env import rollout_fifo
+    jl, op_pt, meta = ppvc_instance_generator(
+        n_modules=5, class_mix='mixed', station_counts=DEFAULT_FACTORY, seed=42)
+    time_lag = meta['time_lag'].astype(float)
+    env_lb, assigned, op_ct_lb = rollout_fifo(jl, op_pt, None, seed=0)
+    env_la, _, _ = rollout_fifo(jl, op_pt, meta['time_lag'], seed=0)
+    _, rms = right_shift_repair(jl, op_pt, time_lag, assigned, op_ct_lagblind=op_ct_lb)
+    ms_lb, ms_la = env_lb.current_makespan[0], env_la.current_makespan[0]
+    _check("paper data point: 113 h lag-free, 206 h lag-aware, 243 h repaired",
+           (ms_lb, ms_la, rms) == (113.0, 206.0, 243.0), f"{ms_lb}, {ms_la}, {rms}")
+    print(f"      [paper data point] seed 42: lag-free FIFO plan {ms_lb:.0f}h -> "
+          f"right-shift-repaired {rms:.0f}h, {100 * (rms / ms_la - 1):.0f}% longer than "
+          f"the lag-aware FIFO schedule ({ms_la:.0f}h)")
 
 
 # ============================================================================
