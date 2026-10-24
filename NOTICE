@@ -35,10 +35,9 @@ Further ported components
                         "PLAN: Parallel Liquid-Inspired Approximation Network
                         for Efficient Representation Learning in Flexible Job
                         Shop Scheduling," arXiv:2608.03041, 2026.
-                        Repository: https://github.com/Dhivya-DD17/PLAN
-                        The repository carries no explicit license; the port is
-                        reproduced on the same terms as the DANIEL-derived code
-                        above.
+                        The PLAN code is not public, and its authors gave
+                        access to it for this work. The port is reproduced on
+                        the same terms as the DANIEL-derived code above.
 
 Further upstreams credited by DANIEL
 ------------------------------------

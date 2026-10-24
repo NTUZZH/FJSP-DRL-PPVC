@@ -5,7 +5,7 @@ place of DANIEL's dual attention network, with DANIEL's actor and critic heads.
 Ported from the PLAN fork of DANIEL (class ``AttL`` in that fork's
 model/PLAN.py). The layers, dimensions, attention heads, context injection and
 pooling are unchanged, and the state-dict key names are preserved, so the
-fork's published checkpoints load here with ``strict=True`` when the PPVC flags
+checkpoints of the fork load here with ``strict=True`` when the PPVC flags
 are off. Two additions mirror DANIEL in model/main_model.py:
 
   * the forward signature takes the optional ``op_type`` / ``mch_type``

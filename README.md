@@ -36,9 +36,9 @@ Please respect the upstream licenses and cite the original works.
   changed and added files are in `backbones/hgnn/LICENSE` and `backbones/hgnn/NOTICE`.
 - **PLAN** (file `model/plan.py`): the parallel-attention and liquid-encoder backbone of the PLAN fork of
   DANIEL, "PLAN: Parallel Liquid-Inspired Approximation Network for Efficient Representation Learning in
-  Flexible Job Shop Scheduling," arXiv:2608.03041, 2026. Its upstream repository
-  (`github.com/Dhivya-DD17/PLAN`) was not publicly accessible on 12 October 2026. The layers and
-  state-dict names are kept, so the fork's checkpoints load unchanged.
+  Flexible Job Shop Scheduling," arXiv:2608.03041, 2026. The PLAN code is not public, and its
+  authors gave access to it for this work. The layers and state-dict names are kept, so the fork's
+  checkpoints load unchanged.
 - Further upstreams credited by DANIEL: L2D (<https://github.com/zcaicaros/L2D>), Google OR-Tools, and
   pyGAT.
 
@@ -228,8 +228,8 @@ whose solver this work builds on.
 
 ## License
 
-This is a derivative work (see `NOTICE`). The DANIEL upstream repository and the PLAN fork carry no
-explicit license, so their code remains under the original authors' copyright. For that reason this
+This is a derivative work (see `NOTICE`). The DANIEL upstream repository carries no explicit license,
+and the PLAN code is not public, so the code of both remains under the original authors' copyright. For that reason this
 repository does not apply a blanket open-source license: doing so would misstate the rights to the
 DANIEL-derived and PLAN-derived components. They are reproduced here for academic transparency and
 reproducibility, with attribution above and in `NOTICE`. The HGNN code in `backbones/hgnn/` is under the
