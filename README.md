@@ -3,8 +3,8 @@
 Code, benchmark generator, test sets, trained policies, and result files for the paper
 
 > **SLAB: Time-Lag-Aware Deep Reinforcement Learning for Flexible Job-Shop Scheduling in PPVC Module Factories**
-> Ziheng Zhang and Wei Zhang.
-> Preprint of an earlier version: [arXiv:2607.11725](https://doi.org/10.48550/arXiv.2607.11725), 2026.
+> Ziheng Zhang, Dhivya Dharshini Kannan, and Wei Zhang.
+> Preprint: [arXiv:2607.11725](https://doi.org/10.48550/arXiv.2607.11725), 2026.
 
 If you use this paper, its benchmark data, or this code in your own work, please cite the paper
 ([BibTeX below](#citation)).
@@ -213,9 +213,9 @@ The HGNN runs are in `backbones/hgnn/save/<run>/` (`best.pt`, `last.pt`, `run_co
 
 ```bibtex
 @article{zhang2026timelag,
-  title   = {Time-Lag-Aware Deep Reinforcement Learning for Flexible Job-Shop
-             Scheduling in {PPVC} Module Factories},
-  author  = {Zhang, Ziheng and Zhang, Wei},
+  title   = {{SLAB}: Time-Lag-Aware Deep Reinforcement Learning for Flexible
+             Job-Shop Scheduling in {PPVC} Module Factories},
+  author  = {Zhang, Ziheng and Kannan, Dhivya Dharshini and Zhang, Wei},
   journal = {arXiv preprint arXiv:2607.11725},
   year    = {2026},
   doi     = {10.48550/arXiv.2607.11725},
